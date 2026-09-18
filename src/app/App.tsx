@@ -817,7 +817,7 @@ export function App() {
           onClick={() => navigate('day')}
         />
         <NavButton
-          label="Week"
+          label="Progress"
           icon="week"
           active={isProgressView}
           onClick={() => navigate(isProgressView ? view : 'week')}
