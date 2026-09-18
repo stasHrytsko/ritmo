@@ -36,7 +36,7 @@ export class RitmoService {
     if (!settings) {
       await this.repos.settings.put({
         key: 'app',
-        schemaVersion: 1,
+        schemaVersion: 2,
         installedAt: now(),
         dayBoundaryHour: 3
       });
@@ -62,7 +62,9 @@ export class RitmoService {
         routineId: routine.id,
         name: routine.name,
         active: routine.active,
-        weekdays: [...routine.weekdays]
+        weekdays: [...routine.weekdays],
+        timing: routine.timing ?? 'anytime',
+        time: routine.timing === 'exact' ? routine.time : undefined
       })),
       createdAt: now()
     };
@@ -110,13 +112,20 @@ export class RitmoService {
     });
   }
 
-  async createRoutine(name: string, weekdays: number[]) {
+  async createRoutine(
+    name: string,
+    weekdays: number[],
+    timing: Routine['timing'] = 'anytime',
+    time?: string
+  ) {
     const stamp = now();
     const routine: Routine = {
       id: id(),
       name: name.trim(),
       active: true,
       weekdays: [...weekdays].sort(),
+      timing,
+      time: timing === 'exact' ? time : undefined,
       createdAt: stamp,
       updatedAt: stamp
     };
@@ -125,7 +134,12 @@ export class RitmoService {
   }
 
   async updateRoutine(routine: Routine) {
-    await this.repos.routines.update({ ...routine, updatedAt: now() });
+    await this.repos.routines.update({
+      ...routine,
+      timing: routine.timing ?? 'anytime',
+      time: routine.timing === 'exact' ? routine.time : undefined,
+      updatedAt: now()
+    });
     await this.refreshCurrentWeekSnapshot();
   }
 
@@ -143,7 +157,9 @@ export class RitmoService {
         routineId: routine.id,
         name: routine.name,
         active: routine.active,
-        weekdays: [...routine.weekdays]
+        weekdays: [...routine.weekdays],
+        timing: routine.timing ?? 'anytime',
+        time: routine.timing === 'exact' ? routine.time : undefined
       }))
     });
   }
