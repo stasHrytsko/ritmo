@@ -32,12 +32,21 @@ export function App() {
   const [lifeTab, setLifeTab] = useState<LifeTab>('routines');
   const [editorOpen, setEditorOpen] = useState(false);
   const [dataMenuOpen, setDataMenuOpen] = useState(false);
-  const [todaySections, setTodaySections] = useState({ goals: true, routine: true });
+  const [todaySections, setTodaySections] = useState({ goals: true, routine: true, anytime: true });
   const [openGoals, setOpenGoals] = useState<Record<string, boolean>>({});
+  const [clockNow, setClockNow] = useState(new Date());
   const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
-  const [routineDraft, setRoutineDraft] = useState<{ id?: string; name: string; weekdays: number[] }>({
+  const [routineDraft, setRoutineDraft] = useState<{
+    id?: string;
+    name: string;
+    weekdays: number[];
+    timing: Routine['timing'];
+    time: string;
+  }>({
     name: '',
-    weekdays: allWeekdays
+    weekdays: allWeekdays,
+    timing: 'anytime',
+    time: '07:30'
   });
   const [goalDraft, setGoalDraft] = useState<{
     id?: string;
@@ -70,6 +79,11 @@ export function App() {
   }, [service, refresh]);
 
   useEffect(() => {
+    const timer = window.setInterval(() => setClockNow(new Date()), 30_000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
     const handler = (event: Event) => {
       event.preventDefault();
       setInstallPrompt(event as BeforeInstallPromptEvent);
@@ -88,9 +102,31 @@ export function App() {
   };
 
   const isProgressView = view === 'week' || view === 'month' || view === 'year';
+  const timedRoutines =
+    view === 'day' && Array.isArray(data?.routines)
+      ? data.routines
+          .filter((state: any) =>
+            state.scheduled
+            && state.routine.timing === 'exact'
+            && Boolean(state.routine.time)
+          )
+          .sort((a: any, b: any) => a.routine.time.localeCompare(b.routine.time))
+      : [];
+  const anytimeRoutines =
+    view === 'day' && Array.isArray(data?.routines)
+      ? data.routines.filter((state: any) =>
+          state.scheduled
+          && (state.routine.timing !== 'exact' || !state.routine.time)
+        )
+      : [];
 
   const resetRoutineDraft = () => {
-    setRoutineDraft({ name: '', weekdays: allWeekdays });
+    setRoutineDraft({
+      name: '',
+      weekdays: allWeekdays,
+      timing: 'anytime',
+      time: '07:30'
+    });
     setEditorOpen(false);
   };
 
@@ -106,7 +142,12 @@ export function App() {
 
   const openNew = () => {
     if (lifeTab === 'routines') {
-      setRoutineDraft({ name: '', weekdays: allWeekdays });
+      setRoutineDraft({
+        name: '',
+        weekdays: allWeekdays,
+        timing: 'anytime',
+        time: '07:30'
+      });
     } else {
       setGoalDraft({
         name: '',
@@ -120,6 +161,7 @@ export function App() {
 
   const saveRoutine = async () => {
     if (!routineDraft.name.trim() || routineDraft.weekdays.length === 0) return;
+    if (routineDraft.timing === 'exact' && !routineDraft.time) return;
 
     if (routineDraft.id) {
       const existing = data.routines.find((item: Routine) => item.id === routineDraft.id);
@@ -127,11 +169,18 @@ export function App() {
         await service.updateRoutine({
           ...existing,
           name: routineDraft.name.trim(),
-          weekdays: routineDraft.weekdays
+          weekdays: routineDraft.weekdays,
+          timing: routineDraft.timing,
+          time: routineDraft.timing === 'exact' ? routineDraft.time : undefined
         });
       }
     } else {
-      await service.createRoutine(routineDraft.name, routineDraft.weekdays);
+      await service.createRoutine(
+        routineDraft.name,
+        routineDraft.weekdays,
+        routineDraft.timing,
+        routineDraft.timing === 'exact' ? routineDraft.time : undefined
+      );
     }
 
     resetRoutineDraft();
@@ -305,30 +354,54 @@ export function App() {
             <section className={`content-block accordion-block ${todaySections.routine ? 'expanded' : 'collapsed'}`}>
               <AccordionHeader
                 title="Routine"
-                meta={`${data.routines.filter((item: any) => item.scheduled && item.done).length}/${data.routines.filter((item: any) => item.scheduled).length}`}
+                meta={`${timedRoutines.filter((item: any) => item.done).length}/${timedRoutines.length}`}
                 open={todaySections.routine}
                 onToggle={() => setTodaySections((current) => ({ ...current, routine: !current.routine }))}
               />
 
               {todaySections.routine && (
-                <div className="stack compact accordion-content">
-                  {data.routines
-                    .filter((state: any) => state.scheduled)
-                    .map((state: any) => (
-                      <button
-                        key={state.routine.routineId}
-                        className={`check-row ${state.done ? 'done' : ''}`}
-                        onClick={async () => {
-                          await service.toggleRoutine(data.date, state.routine.routineId);
-                          await refresh('day');
-                        }}
-                      >
-                        <span className="check-circle">{state.done ? '✓' : ''}</span>
-                        <span>{state.routine.name}</span>
-                      </button>
-                    ))}
-                  {data.routines.filter((state: any) => state.scheduled).length === 0 && (
-                    <Empty text="No routines scheduled for today." />
+                <div className="accordion-content">
+                  {timedRoutines.length > 0 ? (
+                    <RoutineTimeline
+                      items={timedRoutines}
+                      now={clockNow}
+                      onToggle={async (routineId) => {
+                        await service.toggleRoutine(data.date, routineId);
+                        await refresh('day');
+                      }}
+                    />
+                  ) : (
+                    <Empty text="No timed routines scheduled for today." />
+                  )}
+                </div>
+              )}
+            </section>
+
+            <section className={`content-block accordion-block ${todaySections.anytime ? 'expanded' : 'collapsed'}`}>
+              <AccordionHeader
+                title="Anytime Routine"
+                meta={`${anytimeRoutines.filter((item: any) => item.done).length}/${anytimeRoutines.length}`}
+                open={todaySections.anytime}
+                onToggle={() => setTodaySections((current) => ({ ...current, anytime: !current.anytime }))}
+              />
+
+              {todaySections.anytime && (
+                <div className="anytime-list accordion-content">
+                  {anytimeRoutines.map((state: any) => (
+                    <button
+                      key={state.routine.routineId}
+                      className={`anytime-row ${state.done ? 'done' : ''}`}
+                      onClick={async () => {
+                        await service.toggleRoutine(data.date, state.routine.routineId);
+                        await refresh('day');
+                      }}
+                    >
+                      <span>{state.routine.name}</span>
+                      <span className="task-check">{state.done ? '✓' : ''}</span>
+                    </button>
+                  ))}
+                  {anytimeRoutines.length === 0 && (
+                    <Empty text="No anytime routines scheduled for today." />
                   )}
                 </div>
               )}
@@ -586,14 +659,18 @@ export function App() {
                       setRoutineDraft({
                         id: routine.id,
                         name: routine.name,
-                        weekdays: routine.weekdays
+                        weekdays: routine.weekdays,
+                        timing: routine.timing ?? 'anytime',
+                        time: routine.time ?? '07:30'
                       });
                       setEditorOpen(true);
                     }}
                   >
                     <span>
                       <strong>{routine.name}</strong>
-                      <small>{formatSchedule(routine.weekdays)}</small>
+                      <small>
+                        {formatSchedule(routine.weekdays)} · {routine.timing === 'exact' && routine.time ? routine.time : 'Anytime'}
+                      </small>
                     </span>
                     <b>{routine.active ? 'On' : 'Off'}</b>
                     <i>›</i>
@@ -667,6 +744,35 @@ export function App() {
                     ))}
                   </div>
                 </div>
+
+                <div className="field">
+                  <span>Time</span>
+                  <div className="timing-picker">
+                    <button
+                      className={routineDraft.timing === 'exact' ? 'active' : ''}
+                      onClick={() => setRoutineDraft({ ...routineDraft, timing: 'exact' })}
+                    >
+                      Exact time
+                    </button>
+                    <button
+                      className={routineDraft.timing === 'anytime' ? 'active' : ''}
+                      onClick={() => setRoutineDraft({ ...routineDraft, timing: 'anytime' })}
+                    >
+                      Anytime
+                    </button>
+                  </div>
+                </div>
+
+                {routineDraft.timing === 'exact' && (
+                  <label className="field">
+                    <span>Exact time</span>
+                    <input
+                      type="time"
+                      value={routineDraft.time}
+                      onChange={(event) => setRoutineDraft({ ...routineDraft, time: event.target.value })}
+                    />
+                  </label>
+                )}
 
                 <button className="primary" onClick={saveRoutine}>
                   {routineDraft.id ? 'Save changes' : 'Add routine'}
@@ -831,6 +937,80 @@ export function App() {
       </footer>
     </div>
   );
+}
+
+function RoutineTimeline({
+  items,
+  now,
+  onToggle
+}: {
+  items: any[];
+  now: Date;
+  onToggle: (routineId: string) => void | Promise<void>;
+}) {
+  const rowHeight = 58;
+  const markerTop = getTimelineMarkerTop(items, now, rowHeight);
+  const nowLabel = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+  return (
+    <div className="routine-timeline" style={{ height: `${items.length * rowHeight}px` }}>
+      <div className="timeline-axis" />
+
+      {items.map((state, index) => (
+        <div
+          className="timeline-item"
+          key={state.routine.routineId}
+          style={{ top: `${index * rowHeight}px` }}
+        >
+          <span className="timeline-dot" />
+          <button
+            className={`timeline-task ${state.done ? 'done' : ''}`}
+            onClick={() => onToggle(state.routine.routineId)}
+          >
+            <strong>{state.routine.name}</strong>
+            <time>{state.routine.time}</time>
+            <span className="task-check">{state.done ? '✓' : ''}</span>
+          </button>
+        </div>
+      ))}
+
+      {markerTop !== null && (
+        <div className="now-marker" style={{ top: `${markerTop}px` }}>
+          <span className="now-time">{nowLabel}</span>
+          <i className="now-dot" />
+          <b className="now-line" />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function getTimelineMarkerTop(items: any[], now: Date, rowHeight: number) {
+  if (!items.length) return null;
+
+  const times = items.map((item) => timeToMinutes(item.routine.time));
+  const current = now.getHours() * 60 + now.getMinutes();
+  const centers = items.map((_: any, index: number) => index * rowHeight + rowHeight / 2);
+
+  if (current <= times[0]) return centers[0];
+  if (current >= times[times.length - 1]) return centers[centers.length - 1];
+
+  for (let index = 0; index < times.length - 1; index += 1) {
+    const start = times[index];
+    const end = times[index + 1];
+    if (current >= start && current <= end) {
+      const range = Math.max(1, end - start);
+      const ratio = (current - start) / range;
+      return centers[index] + (centers[index + 1] - centers[index]) * ratio;
+    }
+  }
+
+  return centers[0];
+}
+
+function timeToMinutes(value: string) {
+  const [hours, minutes] = value.split(':').map(Number);
+  return hours * 60 + minutes;
 }
 
 function AccordionHeader({
