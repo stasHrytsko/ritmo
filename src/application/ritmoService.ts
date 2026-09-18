@@ -32,16 +32,109 @@ export class RitmoService {
   constructor(private readonly repos: Repositories) {}
 
   async init() {
-    const settings = await this.repos.settings.get();
+    let settings = await this.repos.settings.get();
     if (!settings) {
-      await this.repos.settings.put({
+      settings = {
         key: 'app',
         schemaVersion: 2,
         installedAt: now(),
-        dayBoundaryHour: 3
-      });
+        dayBoundaryHour: 3,
+        defaultsSeedVersion: 0
+      };
+      await this.repos.settings.put(settings);
     }
+
+    if ((settings.defaultsSeedVersion ?? 0) < 1) {
+      await this.seedPersonalRoutine();
+      settings = {
+        ...settings,
+        defaultsSeedVersion: 1
+      };
+      await this.repos.settings.put(settings);
+    }
+
     await this.ensureWeek(new Date());
+  }
+
+  private async seedPersonalRoutine() {
+    const existing = await this.repos.routines.list();
+    const stamp = now();
+    const everyDay = [1, 2, 3, 4, 5, 6, 7];
+    const workDays = [1, 2, 3, 4, 5];
+
+    const defaults: Array<{
+      name: string;
+      weekdays: number[];
+      timing: Routine['timing'];
+      time?: string;
+      match?: (routine: Routine) => boolean;
+    }> = [
+      { name: 'Подъём + стакан воды', weekdays: everyDay, timing: 'exact', time: '07:30' },
+      { name: 'Зарядка 10–15 мин', weekdays: everyDay, timing: 'exact', time: '07:40' },
+      { name: 'Душ', weekdays: everyDay, timing: 'exact', time: '08:00' },
+      { name: 'Завтрак', weekdays: everyDay, timing: 'exact', time: '08:15' },
+      {
+        name: 'Выгулить Локи',
+        weekdays: everyDay,
+        timing: 'exact',
+        time: '08:30',
+        match: (routine) => normalizeRoutineName(routine.name).includes('локи')
+      },
+      { name: 'На работу', weekdays: workDays, timing: 'exact', time: '08:40' },
+      { name: 'Обед', weekdays: everyDay, timing: 'exact', time: '13:00' },
+      { name: 'Ходьба 15 мин · после обеда', weekdays: everyDay, timing: 'exact', time: '13:15' },
+      { name: 'Перекус при голоде', weekdays: everyDay, timing: 'exact', time: '17:00' },
+      { name: 'Ходьба 15 мин · вечером', weekdays: everyDay, timing: 'exact', time: '17:10' },
+      { name: 'Домой', weekdays: workDays, timing: 'exact', time: '18:00' },
+      { name: 'Физическая активность 40 мин', weekdays: everyDay, timing: 'exact', time: '19:00' },
+      { name: 'Ужин', weekdays: everyDay, timing: 'exact', time: '20:00' },
+      { name: 'Ходьба 15 мин · после ужина', weekdays: everyDay, timing: 'exact', time: '20:30' },
+      { name: 'Больше не есть', weekdays: everyDay, timing: 'exact', time: '22:00' },
+      { name: 'Сон', weekdays: everyDay, timing: 'exact', time: '23:00' },
+      {
+        name: 'Разминаться на работе каждые ~2 часа',
+        weekdays: workDays,
+        timing: 'anytime'
+      }
+    ];
+
+    for (const item of defaults) {
+      const normalized = normalizeRoutineName(item.name);
+      const found = existing.find((routine) =>
+        item.match?.(routine)
+        || normalizeRoutineName(routine.name) === normalized
+      );
+
+      if (found) {
+        if (item.match && item.match(found)) {
+          const updated: Routine = {
+            ...found,
+            weekdays: [...item.weekdays],
+            timing: item.timing,
+            time: item.timing === 'exact' ? item.time : undefined,
+            updatedAt: stamp
+          };
+          await this.repos.routines.update(updated);
+        }
+        continue;
+      }
+
+      const routine: Routine = {
+        id: id(),
+        name: item.name,
+        active: true,
+        weekdays: [...item.weekdays],
+        timing: item.timing,
+        time: item.timing === 'exact' ? item.time : undefined,
+        createdAt: stamp,
+        updatedAt: stamp
+      };
+
+      await this.repos.routines.create(routine);
+      existing.push(routine);
+    }
+
+    await this.refreshCurrentWeekSnapshot();
   }
 
   async ensureWeek(date: Date): Promise<WeekRecord> {
@@ -392,4 +485,8 @@ export class RitmoService {
   importBackup(payload: Parameters<Repositories['backup']['importAll']>[0]) {
     return this.repos.backup.importAll(payload);
   }
+}
+
+function normalizeRoutineName(value: string) {
+  return value.trim().toLocaleLowerCase('ru-RU').replace(/\s+/g, ' ');
 }
