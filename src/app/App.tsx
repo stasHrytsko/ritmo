@@ -488,18 +488,57 @@ export function App() {
                   </div>
                 </div>
 
-                <div className="months-grid">
-                  {data.months.map((month: any) => (
-                    <div className="month-card" key={month.month}>
-                      <strong>{month.label.toUpperCase()}</strong>
-                      <span>{month.medals} medals</span>
-                      <div className="month-bar">
-                        <i style={{
-                          width: `${month.knownDays ? Math.round((month.medals / month.knownDays) * 100) : 0}%`
-                        }} />
-                      </div>
-                    </div>
-                  ))}
+                <div className="quarters-list">
+                  {[0, 1, 2, 3].map((quarterIndex) => {
+                    const quarterMonths = data.months.slice(quarterIndex * 3, quarterIndex * 3 + 3);
+                    const quarterMedals = quarterMonths.reduce((sum: number, month: any) => sum + month.medals, 0);
+                    const quarterKnownDays = quarterMonths.reduce((sum: number, month: any) => sum + month.knownDays, 0);
+                    const isCurrentQuarter =
+                      data.year === new Date().getFullYear()
+                      && quarterIndex === Math.floor(new Date().getMonth() / 3);
+
+                    return (
+                      <section
+                        className={`quarter-card ${isCurrentQuarter ? 'current' : ''}`}
+                        key={quarterIndex}
+                      >
+                        <div className="quarter-header">
+                          <div>
+                            <strong>Q{quarterIndex + 1}</strong>
+                            <span>
+                              {quarterMonths.map((month: any) => month.label).join(' · ')}
+                            </span>
+                          </div>
+                          <div className="quarter-meta">
+                            <b>{quarterMedals}</b>
+                            <span>medals</span>
+                          </div>
+                        </div>
+
+                        <div className="quarter-months">
+                          {quarterMonths.map((month: any) => (
+                            <div className="month-card" key={month.month}>
+                              <strong>{month.label.toUpperCase()}</strong>
+                              <span>{month.medals} medals</span>
+                              <div className="month-bar">
+                                <i style={{
+                                  width: `${month.knownDays ? Math.round((month.medals / month.knownDays) * 100) : 0}%`
+                                }} />
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+
+                        <div className="quarter-progress">
+                          <span>
+                            {quarterKnownDays
+                              ? `${Math.round((quarterMedals / quarterKnownDays) * 100)}% of tracked days with medals`
+                              : 'No tracked days yet'}
+                          </span>
+                        </div>
+                      </section>
+                    );
+                  })}
                 </div>
               </>
             )}
