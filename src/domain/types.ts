@@ -68,6 +68,7 @@ export interface AppSettings {
   schemaVersion: number;
   installedAt: string;
   dayBoundaryHour: number;
+  defaultsSeedVersion?: number;
 }
 
 export interface BackupPayload {
