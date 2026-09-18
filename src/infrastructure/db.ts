@@ -1,13 +1,44 @@
-import Dexie, { type EntityTable } from 'dexie';
-import { SCHEMA_VERSION } from '../domain/types';
-import type {
-  AppSettings,
-  Goal,
-  GoalTask,
-  Routine,
-  RoutineCompletion,
-  WeekRecord
+import Dexie, { type EntityTable, type Transaction } from 'dexie';
+import {
+  SCHEMA_VERSION,
+  type AppSettings,
+  type Goal,
+  type GoalTask,
+  type Routine,
+  type RoutineCompletion,
+  type RoutinePlanRevision,
+  type RoutineSnapshot,
+  type WeekRecord
 } from '../domain/types';
+
+const STORES = {
+  routines: 'id, active, timing, time, createdAt, updatedAt',
+  goals: 'id, status, startDate, endDate, createdAt, updatedAt',
+  goalTasks: 'id, goalId, status, plannedWeekId, plannedDate, createdAt, updatedAt',
+  weeks: 'id, startDate, endDate, year, weekNumber',
+  completions: 'id, date, routineId, [date+routineId]',
+  settings: 'key'
+};
+
+/** Shapes as they exist on disk mid-migration, before the current types apply. */
+interface StoredRoutine {
+  timing?: string;
+  time?: string;
+}
+
+interface StoredWeek {
+  startDate: string;
+  routinePlan?: RoutinePlanRevision[];
+  routinePlanSnapshot?: RoutineSnapshot[];
+}
+
+const withTiming = <T extends StoredRoutine>(routine: T) => {
+  if (routine.timing !== 'exact') {
+    routine.timing = 'anytime';
+    delete routine.time;
+  }
+  return routine;
+};
 
 export class RitmoDatabase extends Dexie {
   routines!: EntityTable<Routine, 'id'>;
@@ -19,68 +50,45 @@ export class RitmoDatabase extends Dexie {
 
   constructor() {
     super('ritmo');
+
     this.version(1).stores({
-      routines: 'id, active, createdAt, updatedAt',
-      goals: 'id, status, startDate, endDate, createdAt, updatedAt',
-      goalTasks: 'id, goalId, status, plannedWeekId, plannedDate, createdAt, updatedAt',
-      weeks: 'id, startDate, endDate, year, weekNumber',
-      completions: 'id, date, routineId, [date+routineId]',
-      settings: 'key'
+      ...STORES,
+      routines: 'id, active, createdAt, updatedAt'
     });
 
-    this.version(2).stores({
-      routines: 'id, active, timing, time, createdAt, updatedAt',
-      goals: 'id, status, startDate, endDate, createdAt, updatedAt',
-      goalTasks: 'id, goalId, status, plannedWeekId, plannedDate, createdAt, updatedAt',
-      weeks: 'id, startDate, endDate, year, weekNumber',
-      completions: 'id, date, routineId, [date+routineId]',
-      settings: 'key'
-    }).upgrade(async (tx) => {
-      await tx.table('routines').toCollection().modify((routine) => {
-        if (!routine.timing) routine.timing = 'anytime';
-        if (routine.timing !== 'exact') delete routine.time;
+    // v2 introduced routine timing.
+    this.version(2).stores(STORES).upgrade(async (tx) => {
+      await tx.table<StoredRoutine>('routines').toCollection().modify((routine) => {
+        withTiming(routine);
       });
 
-      await tx.table('weeks').toCollection().modify((week) => {
-        week.routinePlanSnapshot = (week.routinePlanSnapshot ?? []).map((routine: any) => ({
-          ...routine,
-          timing: routine.timing ?? 'anytime',
-          time: routine.timing === 'exact' ? routine.time : undefined
-        }));
+      await tx.table<StoredWeek>('weeks').toCollection().modify((week) => {
+        week.routinePlanSnapshot = (week.routinePlanSnapshot ?? []).map(withTiming);
       });
 
-      const settings = await tx.table('settings').get('app');
-      if (settings) {
-        settings.schemaVersion = 2;
-        await tx.table('settings').put(settings);
-      }
+      await bumpSchemaVersion(tx, 2);
     });
 
-    this.version(3).stores({
-      routines: 'id, active, timing, time, createdAt, updatedAt',
-      goals: 'id, status, startDate, endDate, createdAt, updatedAt',
-      goalTasks: 'id, goalId, status, plannedWeekId, plannedDate, createdAt, updatedAt',
-      weeks: 'id, startDate, endDate, year, weekNumber',
-      completions: 'id, date, routineId, [date+routineId]',
-      settings: 'key'
-    }).upgrade(async (tx) => {
-      await tx.table('weeks').toCollection().modify((week) => {
-        if (!Array.isArray(week.routinePlan)) {
-          week.routinePlan = [{
-            appliesFrom: week.startDate,
-            routines: week.routinePlanSnapshot ?? []
-          }];
-        }
+    // v3 replaced the single week snapshot with dated plan revisions, so that
+    // editing routines mid-week cannot re-judge the days already lived.
+    this.version(3).stores(STORES).upgrade(async (tx) => {
+      await tx.table<StoredWeek>('weeks').toCollection().modify((week) => {
+        week.routinePlan ??= [{
+          appliesFrom: week.startDate,
+          routines: week.routinePlanSnapshot ?? []
+        }];
         delete week.routinePlanSnapshot;
       });
 
-      const settings = await tx.table('settings').get('app');
-      if (settings) {
-        settings.schemaVersion = SCHEMA_VERSION;
-        await tx.table('settings').put(settings);
-      }
+      await bumpSchemaVersion(tx, SCHEMA_VERSION);
     });
   }
+}
+
+async function bumpSchemaVersion(tx: Transaction, version: number) {
+  const table = tx.table<AppSettings, string>('settings');
+  const settings = await table.get('app');
+  if (settings) await table.put({ ...settings, schemaVersion: version });
 }
 
 export const db = new RitmoDatabase();

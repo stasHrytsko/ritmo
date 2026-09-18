@@ -23,6 +23,7 @@ It separates two kinds of progress:
 - JSON backup/export and restore/import, validated before it replaces anything
 - Installable PWA
 - Offline-first storage with IndexedDB
+- Light and dark themes, following the system setting
 
 ## Architecture
 
@@ -53,6 +54,18 @@ Production build:
 npm run build
 ```
 
+Checks (lint, types, tests) — the same set CI runs:
+
+```bash
+npm run check
+```
+
+## The day boundary
+
+A day ends at `dayBoundaryHour` (03:00), not at midnight. Ticking off a
+routine at 01:00 lands on the day you are still living rather than one that
+has barely started, and the app rolls over on its own while it stays open.
+
 ## Storage
 
 V1 has no backend and no authentication. Data stays on the device in IndexedDB.
@@ -80,12 +93,17 @@ stay in the week they were finished in, so past weeks keep reporting the truth.
 
 ```
 src/
-  app/
-  application/
-  domain/
-  infrastructure/
-  repositories/
+  app/             UI shell, screens and components
+  application/     use cases and view models
+  domain/          entities, medal rule, dates, plan revisions, backup format
+  infrastructure/  IndexedDB adapter and migrations
+  repositories/    storage interfaces
 ```
+
+Tests live next to what they cover (`*.test.ts`) and run on Node — the domain
+and application layers have no DOM dependency, and the IndexedDB adapter is
+tested against `fake-indexeddb`, including upgrades from older schema
+versions.
 
 The code is intentionally prepared for future storage migration/sync while keeping V1 small and personal.
 

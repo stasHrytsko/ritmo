@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, type ReactNode } from 'react';
+import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 
 const FOCUSABLE =
   'a[href], button:not([disabled]), input:not([disabled]), select, textarea, [tabindex]:not([tabindex="-1"])';
@@ -19,14 +19,32 @@ export function EditorSheet({
   const sheet = useRef<HTMLDivElement>(null);
   const titleId = useId();
 
-  useEffect(() => {
-    const opener = document.activeElement as HTMLElement | null;
-    sheet.current?.querySelector<HTMLElement>(FOCUSABLE)?.focus();
+  // Callers usually pass a fresh closure on every render. Holding it in a ref
+  // keeps the effects below tied to mount and unmount, so the opener is
+  // captured once and focus is restored once.
+  const close = useRef(onClose);
+  close.current = onClose;
 
+  // Captured during the first render, before React's commit phase applies
+  // autoFocus inside the sheet and makes that the active element.
+  const [opener] = useState(() => document.activeElement as HTMLElement | null);
+
+  useEffect(() => {
+    // autoFocus may already have put the cursor somewhere useful; only pull
+    // focus in when it is still outside.
+    if (!sheet.current?.contains(document.activeElement)) {
+      sheet.current?.querySelector<HTMLElement>(FOCUSABLE)?.focus();
+    }
+    return () => {
+      if (opener && opener !== document.body && document.contains(opener)) opener.focus();
+    };
+  }, [opener]);
+
+  useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         event.stopPropagation();
-        onClose();
+        close.current();
         return;
       }
       if (event.key !== 'Tab' || !sheet.current) return;
@@ -49,14 +67,11 @@ export function EditorSheet({
     };
 
     document.addEventListener('keydown', onKeyDown, true);
-    return () => {
-      document.removeEventListener('keydown', onKeyDown, true);
-      opener?.focus?.();
-    };
-  }, [onClose]);
+    return () => document.removeEventListener('keydown', onKeyDown, true);
+  }, []);
 
   return (
-    <div className="sheet-backdrop" onClick={onClose}>
+    <div className="sheet-backdrop" onClick={() => close.current()}>
       <div
         ref={sheet}
         className="editor-sheet"
@@ -68,7 +83,7 @@ export function EditorSheet({
         <div className="sheet-handle" />
         <div className="sheet-header">
           <strong id={titleId}>{title}</strong>
-          <button type="button" aria-label="Close" onClick={onClose}>×</button>
+          <button type="button" aria-label="Close" onClick={() => close.current()}>×</button>
         </div>
         {children}
       </div>

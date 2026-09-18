@@ -1,7 +1,7 @@
 :root {
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  color: #171717;
-  background: #f3efe6;
+  color: var(--ink);
+  background: var(--bg);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
 
@@ -13,7 +13,34 @@
   --line: #ddd7cc;
   --line-strong: #c9c2b6;
   --accent: #f45b24;
+  --on-ink: #fffdf8;
   --nav-height: 74px;
+
+  --ink-faint: #a9a39a;
+  --track: #ddd8cf;
+  --inset: #e6e0d5;
+  --chip-off: #e5e0d7;
+  --chip-ink: #a9a39a;
+  --chip-line: #bdb6ab;
+  --danger: #a84d34;
+  --scrim: rgba(18, 16, 13, .35);
+  --handle: #c7c1b8;
+  --sheet-btn: #e7e1d7;
+  --nav-bg: rgba(243, 239, 230, .94);
+  --frame: #e7e2d8;
+  --veil: rgba(255, 255, 255, .33);
+  --veil-strong: rgba(255, 255, 255, .4);
+  --veil-weak: rgba(255, 255, 255, .28);
+  --timeline-axis-color: #c9c4bb;
+  --timeline-dot-color: #8e8b86;
+  --timeline-task-bg: rgba(231, 230, 227, .72);
+  --check-line: #98948e;
+  --accent-ring: rgba(244, 91, 36, .45);
+  --raise: 0 1px 6px rgba(45, 39, 30, .08);
+  --raise-sm: 0 1px 5px rgba(45, 39, 30, .08);
+  --sheet-shadow: 0 -16px 60px rgba(0, 0, 0, .14);
+  --frame-shadow: 0 0 60px rgba(35, 29, 22, .08);
+  color-scheme: light;
 }
 
 * {
@@ -256,7 +283,7 @@ h1 {
   padding: 14px;
   border-radius: 20px;
   background: var(--ink);
-  color: white;
+  color: var(--on-ink);
 }
 
 .medal-mark {
@@ -283,7 +310,7 @@ h1 {
 }
 
 .medal-card span {
-  color: #bbb5aa;
+  color: var(--ink-faint);
   font-size: 10px;
 }
 
@@ -292,7 +319,7 @@ h1 {
   padding: 13px;
   border: 1px solid var(--line);
   border-radius: 20px;
-  background: rgba(255, 255, 255, .33);
+  background: var(--veil);
 }
 
 .section-header {
@@ -352,7 +379,7 @@ h1 {
   height: 29px;
   display: grid;
   place-items: center;
-  border: 1.5px solid #a9a39a;
+  border: 1.5px solid var(--chip-ink);
   border-radius: 50%;
   font-size: 12px;
   font-weight: 900;
@@ -361,7 +388,7 @@ h1 {
 .check-row.done .check-circle {
   border-color: var(--ink);
   background: var(--ink);
-  color: white;
+  color: var(--on-ink);
 }
 
 .check-row > span:last-child {
@@ -414,7 +441,7 @@ h1 {
   grid-template-columns: repeat(3, 1fr);
   padding: 4px;
   border-radius: 999px;
-  background: #e6e0d5;
+  background: var(--inset);
 }
 
 .period-switch {
@@ -443,7 +470,7 @@ h1 {
 .segmented button.active {
   background: var(--surface-strong);
   color: var(--ink);
-  box-shadow: 0 1px 6px rgba(45, 39, 30, .08);
+  box-shadow: var(--raise);
 }
 
 .summary-grid {
@@ -489,7 +516,7 @@ h1 {
   margin-top: auto;
   overflow: hidden;
   border-radius: 99px;
-  background: #ddd8cf;
+  background: var(--track);
 }
 
 .progress-bar i {
@@ -554,18 +581,18 @@ h1 {
 }
 
 .week-dots .off {
-  background: #e5e0d7;
-  color: #a9a39a;
+  background: var(--chip-off);
+  color: var(--chip-ink);
 }
 
 .week-dots .pending {
-  border: 1px solid #bdb6ab;
+  border: 1px solid var(--chip-line);
   background: transparent;
 }
 
 .week-dots .done {
   background: var(--ink);
-  color: white;
+  color: var(--on-ink);
 }
 
 .goal-progress-row .progress-bar {
@@ -603,7 +630,7 @@ h1 {
 .month-day.earned {
   background: var(--ink);
   border-color: var(--ink);
-  color: white;
+  color: var(--on-ink);
 }
 
 .month-day.earned b {
@@ -615,7 +642,7 @@ h1 {
 
 .month-day.unknown {
   background: transparent;
-  color: #aaa49a;
+  color: var(--ink-faint);
 }
 
 .year-title {
@@ -677,7 +704,7 @@ h1 {
   margin-top: auto;
   overflow: hidden;
   border-radius: 99px;
-  background: #ddd8cf;
+  background: var(--track);
 }
 
 .month-bar i {
@@ -774,7 +801,7 @@ h1 {
   align-items: flex-end;
   justify-content: center;
   padding-top: env(safe-area-inset-top);
-  background: rgba(18, 16, 13, .35);
+  background: var(--scrim);
   backdrop-filter: blur(4px);
 }
 
@@ -789,7 +816,7 @@ h1 {
     calc(18px + env(safe-area-inset-bottom));
   border-radius: 26px 26px 0 0;
   background: var(--bg);
-  box-shadow: 0 -16px 60px rgba(0, 0, 0, .14);
+  box-shadow: var(--sheet-shadow);
 }
 
 .sheet-handle {
@@ -797,7 +824,7 @@ h1 {
   height: 4px;
   margin: 0 auto 14px;
   border-radius: 99px;
-  background: #c7c1b8;
+  background: var(--handle);
 }
 
 .sheet-header {
@@ -817,7 +844,7 @@ h1 {
   height: 38px;
   border: 0;
   border-radius: 50%;
-  background: #e7e1d7;
+  background: var(--sheet-btn);
   font-size: 22px;
   cursor: pointer;
 }
@@ -875,7 +902,7 @@ input {
 .weekday-picker button.active {
   background: var(--ink);
   border-color: var(--ink);
-  color: white;
+  color: var(--on-ink);
 }
 
 .primary {
@@ -896,7 +923,7 @@ input {
   margin-top: 9px;
   border: 0;
   background: transparent;
-  color: #a84d34;
+  color: var(--danger);
   font-size: 11px;
   font-weight: 750;
   cursor: pointer;
@@ -924,7 +951,7 @@ input {
   border: 0;
   border-radius: 13px;
   background: var(--ink);
-  color: white;
+  color: var(--on-ink);
   font-size: 21px;
   cursor: pointer;
 }
@@ -1007,7 +1034,7 @@ input {
   padding: 7px 12px calc(7px + env(safe-area-inset-bottom));
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  background: rgba(243, 239, 230, .94);
+  background: var(--nav-bg);
   border-top: 1px solid var(--line);
   backdrop-filter: blur(18px);
 }
@@ -1022,7 +1049,7 @@ input {
   align-items: center;
   justify-content: center;
   gap: 4px;
-  color: #8b857d;
+  color: var(--ink-faint);
   font-size: 10px;
   font-weight: 700;
   cursor: pointer;
@@ -1044,13 +1071,13 @@ input {
 
 @media (min-width: 481px) {
   body {
-    background: #e7e2d8;
+    background: var(--frame);
   }
 
   .app-shell {
     min-height: 100dvh;
     background: var(--bg);
-    box-shadow: 0 0 60px rgba(35, 29, 22, .08);
+    box-shadow: var(--frame-shadow);
   }
 }
 
@@ -1118,7 +1145,7 @@ input {
   height: 40px;
   border: 1px solid var(--line);
   border-radius: 50%;
-  background: rgba(255, 255, 255, .4);
+  background: var(--veil-strong);
   display: grid;
   place-items: center;
   font-size: 20px;
@@ -1265,11 +1292,11 @@ input {
   padding: 13px;
   border: 1px solid var(--line);
   border-radius: 20px;
-  background: rgba(255, 255, 255, .28);
+  background: var(--veil-weak);
 }
 
 .quarter-card.current {
-  border-color: rgba(244, 91, 36, .45);
+  border-color: var(--accent-ring);
 }
 
 .quarter-header {
@@ -1345,7 +1372,7 @@ input {
   bottom: 29px;
   width: 1.5px;
   border-radius: 99px;
-  background: #c9c4bb;
+  background: var(--timeline-axis-color);
 }
 
 .timeline-item {
@@ -1366,7 +1393,7 @@ input {
   height: 13px;
   border: 2px solid var(--bg);
   border-radius: 50%;
-  background: #8e8b86;
+  background: var(--timeline-dot-color);
   transform: translateY(-50%);
 }
 
@@ -1377,7 +1404,7 @@ input {
   padding: 0 10px 0 13px;
   border: 0;
   border-radius: 13px;
-  background: rgba(231, 230, 227, .72);
+  background: var(--timeline-task-bg);
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto 31px;
   align-items: center;
@@ -1412,9 +1439,9 @@ input {
   height: 27px;
   display: grid;
   place-items: center;
-  border: 1.5px solid #98948e;
+  border: 1.5px solid var(--check-line);
   border-radius: 50%;
-  color: white;
+  color: var(--on-ink);
   font-size: 11px;
   font-weight: 900;
 }
@@ -1513,7 +1540,7 @@ input {
   gap: 6px;
   padding: 4px;
   border-radius: 14px;
-  background: #e6e0d5;
+  background: var(--inset);
 }
 
 .timing-picker button {
@@ -1530,7 +1557,7 @@ input {
 .timing-picker button.active {
   background: var(--surface-strong);
   color: var(--ink);
-  box-shadow: 0 1px 5px rgba(45, 39, 30, .08);
+  box-shadow: var(--raise-sm);
 }
 
 .error-banner {
@@ -1572,4 +1599,49 @@ input {
   background: transparent;
   font-size: 13px;
   font-weight: 600;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #14130f;
+    --surface: #1b1914;
+    --surface-strong: #221f19;
+    --ink: #f1ece1;
+    --muted: #9c958a;
+    --line: #2c2921;
+    --line-strong: #3d382e;
+    --accent: #ff6a35;
+    --on-ink: #14130f;
+
+    --ink-faint: #7d7668;
+    --track: #302b23;
+    --inset: #1f1c16;
+    --chip-off: #2d2921;
+    --chip-ink: #6e685d;
+    --chip-line: #514a3d;
+    --danger: #ff7f61;
+    --scrim: rgba(0, 0, 0, .62);
+    --handle: #454036;
+    --sheet-btn: #2a2620;
+    --nav-bg: rgba(20, 19, 15, .94);
+    --frame: #0e0d0a;
+    --veil: rgba(255, 255, 255, .045);
+    --veil-strong: rgba(255, 255, 255, .07);
+    --veil-weak: rgba(255, 255, 255, .03);
+    --timeline-axis-color: #332f27;
+    --timeline-dot-color: #5d5749;
+    --timeline-task-bg: rgba(255, 255, 255, .05);
+    --check-line: #5d5749;
+    --accent-ring: rgba(255, 106, 53, .5);
+    --raise: 0 1px 6px rgba(0, 0, 0, .45);
+    --raise-sm: 0 1px 5px rgba(0, 0, 0, .45);
+    --sheet-shadow: 0 -16px 60px rgba(0, 0, 0, .55);
+    --frame-shadow: 0 0 60px rgba(0, 0, 0, .5);
+    color-scheme: dark;
+  }
+}
+
+/* Days that have not happened yet are shown, but muted. */
+.week-strip .future {
+  opacity: .45;
 }

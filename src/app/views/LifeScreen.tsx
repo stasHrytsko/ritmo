@@ -315,10 +315,7 @@ export function LifeScreen({
             <button
               type="button"
               className="danger-link"
-              onClick={async () => {
-                await onDeleteRoutine(routineDraft.id!);
-                closeRoutineEditor();
-              }}
+              onClick={() => void onDeleteRoutine(routineDraft.id!).then(closeRoutineEditor)}
             >
               Delete routine
             </button>
@@ -401,10 +398,7 @@ export function LifeScreen({
               <button
                 type="button"
                 className="danger-link"
-                onClick={async () => {
-                  await onDeleteGoal(goalDraft.id!);
-                  closeGoalEditor();
-                }}
+                onClick={() => void onDeleteGoal(goalDraft.id!).then(closeGoalEditor)}
               >
                 Delete goal
               </button>

@@ -24,7 +24,7 @@ const requireArray = (payload: Record<string, unknown>, key: string): Record<str
   if (!value.every(isRecord)) {
     throw new BackupValidationError(`Backup has a malformed entry in "${key}".`);
   }
-  return value as Record<string, unknown>[];
+  return value;
 };
 
 const requireFields = (rows: Record<string, unknown>[], key: string, fields: string[]) => {
@@ -45,7 +45,7 @@ const normalizeRoutineLike = (routine: Record<string, unknown>) => ({
 });
 
 const normalizeWeek = (week: Record<string, unknown>): WeekRecord => {
-  const startDate = week.startDate as string;
+  const startDate = String(week.startDate);
   const legacy = Array.isArray(week.routinePlanSnapshot)
     ? (week.routinePlanSnapshot as Record<string, unknown>[])
     : [];
@@ -62,7 +62,8 @@ const normalizeWeek = (week: Record<string, unknown>): WeekRecord => {
         routines: legacy.map(normalizeRoutineLike) as unknown as RoutineSnapshot[]
       }];
 
-  const { routinePlanSnapshot: _legacy, ...rest } = week;
+  const rest = { ...week };
+  delete rest.routinePlanSnapshot;
   return {
     ...(rest as unknown as WeekRecord),
     routinePlan: revisions.sort((a, b) => a.appliesFrom.localeCompare(b.appliesFrom))
