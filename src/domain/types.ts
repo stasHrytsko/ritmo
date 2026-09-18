@@ -1,11 +1,14 @@
 export type ISODate = string;
 export type GoalStatus = 'active' | 'paused' | 'done';
+export type RoutineTiming = 'exact' | 'anytime';
 
 export interface Routine {
   id: string;
   name: string;
   active: boolean;
   weekdays: number[]; // ISO weekday: Monday=1 ... Sunday=7
+  timing: RoutineTiming;
+  time?: string; // HH:mm when timing === 'exact'
   createdAt: string;
   updatedAt: string;
 }
@@ -15,6 +18,8 @@ export interface RoutineSnapshot {
   name: string;
   active: boolean;
   weekdays: number[];
+  timing: RoutineTiming;
+  time?: string;
 }
 
 export interface Goal {
