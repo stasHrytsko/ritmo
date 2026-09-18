@@ -1111,3 +1111,34 @@ input {
 @keyframes loader-spin {
   to { transform: rotate(360deg); }
 }
+
+
+.topbar-menu {
+  width: 40px;
+  height: 40px;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, .4);
+  display: grid;
+  place-items: center;
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.data-sheet-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 4px 0 10px;
+}
+
+.data-sheet-copy strong {
+  font-size: 13px;
+}
+
+.data-sheet-copy span {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.45;
+}
