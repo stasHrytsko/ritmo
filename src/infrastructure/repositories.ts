@@ -47,7 +47,7 @@ export const repositories: Repositories = {
   },
   backup: {
     exportAll: async () => ({
-      schemaVersion: 1,
+      schemaVersion: 2,
       exportedAt: new Date().toISOString(),
       routines: await db.routines.toArray(),
       goals: await db.goals.toArray(),
@@ -57,9 +57,29 @@ export const repositories: Repositories = {
       settings: await db.settings.toArray()
     }),
     importAll: async (payload: BackupPayload) => {
-      if (payload.schemaVersion !== 1) {
+      if (![1, 2].includes(payload.schemaVersion)) {
         throw new Error('Unsupported backup version');
       }
+
+      const routines = payload.routines.map((routine: any) => ({
+        ...routine,
+        timing: routine.timing ?? 'anytime',
+        time: routine.timing === 'exact' ? routine.time : undefined
+      }));
+
+      const weeks = payload.weeks.map((week: any) => ({
+        ...week,
+        routinePlanSnapshot: (week.routinePlanSnapshot ?? []).map((routine: any) => ({
+          ...routine,
+          timing: routine.timing ?? 'anytime',
+          time: routine.timing === 'exact' ? routine.time : undefined
+        }))
+      }));
+
+      const settings = payload.settings.map((settings: any) => ({
+        ...settings,
+        schemaVersion: 2
+      }));
 
       await db.transaction(
         'rw',
@@ -73,12 +93,12 @@ export const repositories: Repositories = {
             db.completions.clear(),
             db.settings.clear()
           ]);
-          await db.routines.bulkPut(payload.routines);
+          await db.routines.bulkPut(routines);
           await db.goals.bulkPut(payload.goals);
           await db.goalTasks.bulkPut(payload.goalTasks);
-          await db.weeks.bulkPut(payload.weeks);
+          await db.weeks.bulkPut(weeks);
           await db.completions.bulkPut(payload.completions);
-          await db.settings.bulkPut(payload.settings);
+          await db.settings.bulkPut(settings);
         }
       );
     }
