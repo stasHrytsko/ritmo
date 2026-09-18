@@ -31,6 +31,7 @@ export function App() {
   const [busy, setBusy] = useState(true);
   const [lifeTab, setLifeTab] = useState<LifeTab>('routines');
   const [editorOpen, setEditorOpen] = useState(false);
+  const [dataMenuOpen, setDataMenuOpen] = useState(false);
   const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [routineDraft, setRoutineDraft] = useState<{ id?: string; name: string; weekdays: number[] }>({
     name: '',
@@ -80,6 +81,7 @@ export function App() {
     setData(null);
     setView(target);
     setEditorOpen(false);
+    setDataMenuOpen(false);
     void refresh(target);
   };
 
@@ -191,7 +193,20 @@ export function App() {
     <div className="app-shell">
       <header className="topbar">
         <button className="brand" onClick={() => navigate('day')}>Ritmo<span>.</span></button>
-        <div className="topbar-mark">{view === 'day' ? 'Today' : isProgressView ? 'Progress' : 'Edit'}</div>
+        {view === 'life' ? (
+          <button
+            className="topbar-menu"
+            aria-label="Data menu"
+            onClick={() => {
+              setEditorOpen(false);
+              setDataMenuOpen(true);
+            }}
+          >
+            ⋯
+          </button>
+        ) : (
+          <div className="topbar-mark">{view === 'day' ? 'Today' : 'Progress'}</div>
+        )}
       </header>
 
       <main className={busy ? 'loading' : ''}>
@@ -680,31 +695,42 @@ export function App() {
               </EditorSheet>
             )}
 
-            <section className="utility-section">
-              {installPrompt && (
-                <button className="utility-row" onClick={installApp}>
-                  <span><strong>Install Ritmo</strong><small>Add it to your home screen</small></span>
-                  <i>›</i>
-                </button>
-              )}
-              {isIOS() && !isStandalone() && (
-                <div className="ios-hint">
-                  <strong>Add to Home Screen</strong>
-                  <span>Safari → Share → Add to Home Screen</span>
+            {(installPrompt || (isIOS() && !isStandalone())) && (
+              <section className="utility-section">
+                {installPrompt && (
+                  <button className="utility-row" onClick={installApp}>
+                    <span><strong>Install Ritmo</strong><small>Add it to your home screen</small></span>
+                    <i>›</i>
+                  </button>
+                )}
+                {isIOS() && !isStandalone() && (
+                  <div className="ios-hint">
+                    <strong>Add to Home Screen</strong>
+                    <span>Safari → Share → Add to Home Screen</span>
+                  </div>
+                )}
+              </section>
+            )}
+
+            {dataMenuOpen && (
+              <EditorSheet title="Data" onClose={() => setDataMenuOpen(false)}>
+                <div className="data-sheet-copy">
+                  <strong>Local data</strong>
+                  <span>Ritmo stores your routines, goals and tracking history on this device.</span>
                 </div>
-              )}
-              <div className="backup-actions">
-                <button onClick={exportBackup}>Export backup</button>
-                <button onClick={() => importRef.current?.click()}>Import backup</button>
-                <input
-                  ref={importRef}
-                  hidden
-                  type="file"
-                  accept="application/json"
-                  onChange={(event) => void importBackup(event.target.files?.[0])}
-                />
-              </div>
-            </section>
+                <div className="backup-actions">
+                  <button onClick={exportBackup}>Export backup</button>
+                  <button onClick={() => importRef.current?.click()}>Import backup</button>
+                  <input
+                    ref={importRef}
+                    hidden
+                    type="file"
+                    accept="application/json"
+                    onChange={(event) => void importBackup(event.target.files?.[0])}
+                  />
+                </div>
+              </EditorSheet>
+            )}
           </section>
         )}
       </main>
