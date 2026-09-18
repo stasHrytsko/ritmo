@@ -46,6 +46,8 @@ export interface CompletionRepository {
   listByDate(date: ISODate): Promise<RoutineCompletion[]>;
   listBetween(start: ISODate, end: ISODate): Promise<RoutineCompletion[]>;
   put(completion: RoutineCompletion): Promise<void>;
+  /** Atomic read-modify-write. Returns the resulting done state. */
+  toggle(date: ISODate, routineId: string, completedAt: string): Promise<boolean>;
   removeByRoutine(routineId: string): Promise<void>;
 }
 

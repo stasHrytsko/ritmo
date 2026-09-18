@@ -51,6 +51,22 @@ export const repositories: Repositories = {
     listByDate: (date) => db.completions.where('date').equals(date).toArray(),
     listBetween: (start, end) => db.completions.where('date').between(start, end, true, true).toArray(),
     put: async (completion) => { await db.completions.put(completion); },
+    toggle: async (date, routineId, completedAt) => {
+      let done = false;
+      await db.transaction('rw', db.completions, async () => {
+        const key = `${date}:${routineId}`;
+        const current = await db.completions.get(key);
+        done = current?.done !== true;
+        await db.completions.put({
+          id: key,
+          date,
+          routineId,
+          done,
+          completedAt: done ? completedAt : undefined
+        });
+      });
+      return done;
+    },
     removeByRoutine: async (routineId) => {
       await db.completions.where('routineId').equals(routineId).delete();
     }
