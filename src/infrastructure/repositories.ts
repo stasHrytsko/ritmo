@@ -1,4 +1,5 @@
-import type { BackupPayload } from '../domain/types';
+import { parseBackup } from '../domain/backup';
+import { SCHEMA_VERSION, type BackupPayload } from '../domain/types';
 import type { Repositories } from '../repositories/interfaces';
 import { db } from './db';
 
@@ -8,7 +9,12 @@ export const repositories: Repositories = {
     get: (id) => db.routines.get(id),
     create: async (routine) => { await db.routines.add(routine); },
     update: async (routine) => { await db.routines.put(routine); },
-    remove: async (id) => { await db.routines.delete(id); }
+    remove: async (id) => {
+      await db.transaction('rw', db.routines, db.completions, async () => {
+        await db.routines.delete(id);
+        await db.completions.where('routineId').equals(id).delete();
+      });
+    }
   },
   goals: {
     list: () => db.goals.orderBy('createdAt').toArray(),
@@ -26,6 +32,11 @@ export const repositories: Repositories = {
     list: () => db.goalTasks.orderBy('createdAt').toArray(),
     listByGoal: (goalId) => db.goalTasks.where('goalId').equals(goalId).toArray(),
     listByWeek: (weekId) => db.goalTasks.where('plannedWeekId').equals(weekId).toArray(),
+    listOpenBeforeWeek: (weekId) =>
+      db.goalTasks
+        .where('status').equals('open')
+        .filter((task) => task.plannedWeekId < weekId)
+        .toArray(),
     create: async (task) => { await db.goalTasks.add(task); },
     update: async (task) => { await db.goalTasks.put(task); },
     remove: async (id) => { await db.goalTasks.delete(id); }
@@ -39,7 +50,10 @@ export const repositories: Repositories = {
     list: () => db.completions.orderBy('date').toArray(),
     listByDate: (date) => db.completions.where('date').equals(date).toArray(),
     listBetween: (start, end) => db.completions.where('date').between(start, end, true, true).toArray(),
-    put: async (completion) => { await db.completions.put(completion); }
+    put: async (completion) => { await db.completions.put(completion); },
+    removeByRoutine: async (routineId) => {
+      await db.completions.where('routineId').equals(routineId).delete();
+    }
   },
   settings: {
     get: () => db.settings.get('app'),
@@ -47,7 +61,7 @@ export const repositories: Repositories = {
   },
   backup: {
     exportAll: async () => ({
-      schemaVersion: 2,
+      schemaVersion: SCHEMA_VERSION,
       exportedAt: new Date().toISOString(),
       routines: await db.routines.toArray(),
       goals: await db.goals.toArray(),
@@ -57,29 +71,9 @@ export const repositories: Repositories = {
       settings: await db.settings.toArray()
     }),
     importAll: async (payload: BackupPayload) => {
-      if (![1, 2].includes(payload.schemaVersion)) {
-        throw new Error('Unsupported backup version');
-      }
-
-      const routines = payload.routines.map((routine: any) => ({
-        ...routine,
-        timing: routine.timing ?? 'anytime',
-        time: routine.timing === 'exact' ? routine.time : undefined
-      }));
-
-      const weeks = payload.weeks.map((week: any) => ({
-        ...week,
-        routinePlanSnapshot: (week.routinePlanSnapshot ?? []).map((routine: any) => ({
-          ...routine,
-          timing: routine.timing ?? 'anytime',
-          time: routine.timing === 'exact' ? routine.time : undefined
-        }))
-      }));
-
-      const settings = payload.settings.map((settings: any) => ({
-        ...settings,
-        schemaVersion: 2
-      }));
+      // Validate and upgrade before anything is cleared: a malformed file must
+      // never be able to land halfway through a restore.
+      const restored = parseBackup(payload);
 
       await db.transaction(
         'rw',
@@ -93,12 +87,12 @@ export const repositories: Repositories = {
             db.completions.clear(),
             db.settings.clear()
           ]);
-          await db.routines.bulkPut(routines);
-          await db.goals.bulkPut(payload.goals);
-          await db.goalTasks.bulkPut(payload.goalTasks);
-          await db.weeks.bulkPut(weeks);
-          await db.completions.bulkPut(payload.completions);
-          await db.settings.bulkPut(settings);
+          await db.routines.bulkPut(restored.routines);
+          await db.goals.bulkPut(restored.goals);
+          await db.goalTasks.bulkPut(restored.goalTasks);
+          await db.weeks.bulkPut(restored.weeks);
+          await db.completions.bulkPut(restored.completions);
+          await db.settings.bulkPut(restored.settings);
         }
       );
     }

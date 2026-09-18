@@ -1532,3 +1532,44 @@ input {
   color: var(--ink);
   box-shadow: 0 1px 5px rgba(45, 39, 30, .08);
 }
+
+.error-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding: 14px 16px;
+  border: 1px solid var(--line-strong);
+  border-left: 3px solid var(--accent);
+  border-radius: 14px;
+  background: var(--surface-strong);
+}
+
+.error-banner div {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.error-banner strong {
+  font-size: 14px;
+  letter-spacing: -0.01em;
+}
+
+.error-banner span {
+  font-size: 13px;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.error-banner button {
+  flex: none;
+  padding: 8px 14px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  background: transparent;
+  font-size: 13px;
+  font-weight: 600;
+}

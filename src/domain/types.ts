@@ -2,6 +2,9 @@ export type ISODate = string;
 export type GoalStatus = 'active' | 'paused' | 'done';
 export type RoutineTiming = 'exact' | 'anytime';
 
+export const SCHEMA_VERSION = 3;
+export const SUPPORTED_SCHEMA_VERSIONS = [1, 2, 3];
+
 export interface Routine {
   id: string;
   name: string;
@@ -20,6 +23,16 @@ export interface RoutineSnapshot {
   weekdays: number[];
   timing: RoutineTiming;
   time?: string;
+}
+
+/**
+ * A week's routine plan is versioned: editing routines mid-week adds a new
+ * revision from that day on, so days already lived keep the plan they were
+ * judged against.
+ */
+export interface RoutinePlanRevision {
+  appliesFrom: ISODate; // inclusive
+  routines: RoutineSnapshot[];
 }
 
 export interface Goal {
@@ -58,7 +71,7 @@ export interface WeekRecord {
   endDate: ISODate;
   year: number;
   weekNumber: number;
-  routinePlanSnapshot: RoutineSnapshot[];
+  routinePlan: RoutinePlanRevision[];
   createdAt: string;
   closedAt?: string;
 }

@@ -20,7 +20,7 @@ It separates two kinds of progress:
 - Year overview
 - Goals with weekly tasks
 - Routine scheduling by weekday
-- JSON backup/export and restore/import
+- JSON backup/export and restore/import, validated before it replaces anything
 - Installable PWA
 - Offline-first storage with IndexedDB
 
@@ -68,6 +68,13 @@ For every active routine:
 - not scheduled today → automatically satisfied
 
 A medal is earned when all active routines are satisfied. Auto-satisfied routines do **not** create fake completion records.
+
+Each week stores its routine plan as dated revisions. Editing routines mid-week
+adds a revision starting that day, so days already lived keep the plan they were
+judged against and past medals never change retroactively.
+
+Goal tasks left open when a week ends move to the current week. Completed tasks
+stay in the week they were finished in, so past weeks keep reporting the truth.
 
 ## Project structure
 

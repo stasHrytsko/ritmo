@@ -29,6 +29,7 @@ export interface GoalTaskRepository {
   list(): Promise<GoalTask[]>;
   listByGoal(goalId: string): Promise<GoalTask[]>;
   listByWeek(weekId: ISODate): Promise<GoalTask[]>;
+  listOpenBeforeWeek(weekId: ISODate): Promise<GoalTask[]>;
   create(task: GoalTask): Promise<void>;
   update(task: GoalTask): Promise<void>;
   remove(id: string): Promise<void>;
@@ -45,6 +46,7 @@ export interface CompletionRepository {
   listByDate(date: ISODate): Promise<RoutineCompletion[]>;
   listBetween(start: ISODate, end: ISODate): Promise<RoutineCompletion[]>;
   put(completion: RoutineCompletion): Promise<void>;
+  removeByRoutine(routineId: string): Promise<void>;
 }
 
 export interface SettingsRepository {

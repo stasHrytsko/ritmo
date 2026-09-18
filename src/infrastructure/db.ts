@@ -1,4 +1,5 @@
 import Dexie, { type EntityTable } from 'dexie';
+import { SCHEMA_VERSION } from '../domain/types';
 import type {
   AppSettings,
   Goal,
@@ -51,6 +52,31 @@ export class RitmoDatabase extends Dexie {
       const settings = await tx.table('settings').get('app');
       if (settings) {
         settings.schemaVersion = 2;
+        await tx.table('settings').put(settings);
+      }
+    });
+
+    this.version(3).stores({
+      routines: 'id, active, timing, time, createdAt, updatedAt',
+      goals: 'id, status, startDate, endDate, createdAt, updatedAt',
+      goalTasks: 'id, goalId, status, plannedWeekId, plannedDate, createdAt, updatedAt',
+      weeks: 'id, startDate, endDate, year, weekNumber',
+      completions: 'id, date, routineId, [date+routineId]',
+      settings: 'key'
+    }).upgrade(async (tx) => {
+      await tx.table('weeks').toCollection().modify((week) => {
+        if (!Array.isArray(week.routinePlan)) {
+          week.routinePlan = [{
+            appliesFrom: week.startDate,
+            routines: week.routinePlanSnapshot ?? []
+          }];
+        }
+        delete week.routinePlanSnapshot;
+      });
+
+      const settings = await tx.table('settings').get('app');
+      if (settings) {
+        settings.schemaVersion = SCHEMA_VERSION;
         await tx.table('settings').put(settings);
       }
     });

@@ -1,11 +1,13 @@
-import type { Goal, GoalTask, Routine, WeekRecord } from '../domain/types';
+import { SCHEMA_VERSION, type Goal, type GoalTask, type Routine, type RoutineSnapshot, type WeekRecord } from '../domain/types';
 import { getRoutineDayStates, hasDayMedal } from '../domain/medal';
+import { planForDate, routinesInWeek, withPlanRevision } from '../domain/plan';
 import {
   addDays,
   daysInMonth,
   daysLeftInYear,
   formatRange,
   fromISODate,
+  isoWeekday,
   monthName,
   toISODate,
   weekEnd,
@@ -29,14 +31,28 @@ export interface TodayView {
 }
 
 export class RitmoService {
+  private booting?: Promise<void>;
+
   constructor(private readonly repos: Repositories) {}
 
-  async init() {
+  /**
+   * Safe to call more than once: concurrent callers share one run. Without
+   * this, two overlapping inits both see an unseeded database and seed twice.
+   */
+  init() {
+    this.booting ??= this.boot().catch((error) => {
+      this.booting = undefined;
+      throw error;
+    });
+    return this.booting;
+  }
+
+  private async boot() {
     let settings = await this.repos.settings.get();
     if (!settings) {
       settings = {
         key: 'app',
-        schemaVersion: 2,
+        schemaVersion: SCHEMA_VERSION,
         installedAt: now(),
         dayBoundaryHour: 3,
         defaultsSeedVersion: 0
@@ -151,14 +167,10 @@ export class RitmoService {
       endDate: toISODate(end),
       year: start.getFullYear(),
       weekNumber: weekNumber(date),
-      routinePlanSnapshot: routines.map((routine) => ({
-        routineId: routine.id,
-        name: routine.name,
-        active: routine.active,
-        weekdays: [...routine.weekdays],
-        timing: routine.timing ?? 'anytime',
-        time: routine.timing === 'exact' ? routine.time : undefined
-      })),
+      routinePlan: [{
+        appliesFrom: toISODate(start),
+        routines: routines.map(toSnapshot)
+      }],
       createdAt: now()
     };
     await this.repos.weeks.put(record);
@@ -167,9 +179,10 @@ export class RitmoService {
 
   async getToday(date = new Date()): Promise<TodayView> {
     const week = await this.ensureWeek(date);
+    await this.rolloverOpenGoalTasks(week);
     const dateKey = toISODate(date);
     const completions = await this.repos.completions.listByDate(dateKey);
-    const states = getRoutineDayStates(week.routinePlanSnapshot, completions, date);
+    const states = getRoutineDayStates(planForDate(week, dateKey), completions, date);
     const goals = (await this.repos.goals.list()).filter((goal) => goal.status === 'active');
     const weekTasks = await this.repos.goalTasks.listByWeek(week.id);
 
@@ -241,20 +254,39 @@ export class RitmoService {
     await this.refreshCurrentWeekSnapshot();
   }
 
-  private async refreshCurrentWeekSnapshot() {
-    const current = await this.ensureWeek(new Date());
+  /**
+   * Records the current routine list as a new plan revision starting today.
+   * Days already lived keep the revision they were judged against, so editing
+   * routines never retroactively takes away past medals.
+   */
+  private async refreshCurrentWeekSnapshot(today = new Date()) {
+    const current = await this.ensureWeek(today);
     const routines = await this.repos.routines.list();
-    await this.repos.weeks.put({
-      ...current,
-      routinePlanSnapshot: routines.map((routine) => ({
-        routineId: routine.id,
-        name: routine.name,
-        active: routine.active,
-        weekdays: [...routine.weekdays],
-        timing: routine.timing ?? 'anytime',
-        time: routine.timing === 'exact' ? routine.time : undefined
-      }))
-    });
+    await this.repos.weeks.put(
+      withPlanRevision(current, toISODate(today), routines.map(toSnapshot))
+    );
+  }
+
+  /**
+   * Open tasks left behind in past weeks move to the current week instead of
+   * disappearing. Done tasks stay where they were, so past weeks stay honest.
+   */
+  private async rolloverOpenGoalTasks(week: WeekRecord) {
+    if (week.id !== weekId(new Date())) return false;
+
+    const stale = await this.repos.goalTasks.listOpenBeforeWeek(week.id);
+    if (stale.length === 0) return false;
+
+    const stamp = now();
+    for (const task of stale) {
+      await this.repos.goalTasks.update({
+        ...task,
+        plannedWeekId: week.id,
+        plannedDate: undefined,
+        updatedAt: stamp
+      });
+    }
+    return true;
   }
 
   async createGoal(name: string, startDate: string, endDate: string) {
@@ -304,6 +336,7 @@ export class RitmoService {
 
   async getWeek(date = new Date()) {
     const week = await this.ensureWeek(date);
+    await this.rolloverOpenGoalTasks(week);
     const completions = await this.repos.completions.listBetween(week.startDate, week.endDate);
     const tasks = await this.repos.goalTasks.listByWeek(week.id);
     const goals = (await this.repos.goals.list()).filter((goal) => goal.status !== 'paused');
@@ -313,7 +346,7 @@ export class RitmoService {
       const day = addDays(fromISODate(week.startDate), index);
       const key = toISODate(day);
       const states = getRoutineDayStates(
-        week.routinePlanSnapshot,
+        planForDate(week, key),
         completions.filter((item) => item.date === key),
         day
       );
@@ -326,13 +359,17 @@ export class RitmoService {
       };
     });
 
-    const routineProgress = week.routinePlanSnapshot
+    const routineProgress = routinesInWeek(week)
       .filter((routine) => routine.active)
       .map((routine) => {
         const state = Array.from({ length: 7 }, (_, index) => {
           const day = addDays(fromISODate(week.startDate), index);
           const key = toISODate(day);
-          const scheduled = routine.weekdays.includes(((day.getDay() + 6) % 7) + 1);
+          // A routine only counts on days whose plan revision actually had it.
+          const planned = planForDate(week, key)
+            .find((item) => item.routineId === routine.routineId);
+          const scheduled = Boolean(planned?.active)
+            && Boolean(planned?.weekdays.includes(isoWeekday(day)));
           const done = completions.some(
             (item) => item.date === key && item.routineId === routine.routineId && item.done
           );
@@ -397,7 +434,7 @@ export class RitmoService {
       if (!week || day > today) return { date: day, medal: false, known: false };
 
       const states = getRoutineDayStates(
-        week.routinePlanSnapshot,
+        planForDate(week, key),
         allCompletions.filter((item) => item.date === key),
         day
       );
@@ -444,7 +481,7 @@ export class RitmoService {
 
         knownDays += 1;
         const states = getRoutineDayStates(
-          week.routinePlanSnapshot,
+          planForDate(week, key),
           completions.filter((item) => item.date === key),
           current
         );
@@ -485,6 +522,17 @@ export class RitmoService {
   importBackup(payload: Parameters<Repositories['backup']['importAll']>[0]) {
     return this.repos.backup.importAll(payload);
   }
+}
+
+function toSnapshot(routine: Routine): RoutineSnapshot {
+  return {
+    routineId: routine.id,
+    name: routine.name,
+    active: routine.active,
+    weekdays: [...routine.weekdays],
+    timing: routine.timing ?? 'anytime',
+    time: routine.timing === 'exact' ? routine.time : undefined
+  };
 }
 
 function normalizeRoutineName(value: string) {

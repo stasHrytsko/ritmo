@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { Goal, GoalTask, Routine } from '../domain/types';
+import { describeBackup, parseBackup } from '../domain/backup';
 import { addDays, monthName, toISODate, weekdayName, weekStart } from '../domain/time';
 import { repositories } from '../infrastructure/repositories';
 import { RitmoService } from '../application/ritmoService';
@@ -29,6 +30,7 @@ export function App() {
   const [view, setView] = useState<View>('day');
   const [data, setData] = useState<any>(null);
   const [busy, setBusy] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [lifeTab, setLifeTab] = useState<LifeTab>('routines');
   const [editorOpen, setEditorOpen] = useState(false);
   const [dataMenuOpen, setDataMenuOpen] = useState(false);
@@ -69,14 +71,32 @@ export function App() {
       if (target === 'month') setData(await service.getMonth());
       if (target === 'year') setData(await service.getYear());
       if (target === 'life') setData(await service.getLife());
+      setError(null);
+    } catch (cause) {
+      setError(describeError(cause));
     } finally {
       setBusy(false);
     }
   }, [service]);
 
-  useEffect(() => {
-    void service.init().then(() => refresh('day'));
+  const start = useCallback(async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      await service.init();
+    } catch (cause) {
+      // Storage can be unavailable entirely: private browsing, a full quota, a
+      // corrupted database. Without this the app just span forever.
+      setError(describeError(cause));
+      setBusy(false);
+      return;
+    }
+    await refresh('day');
   }, [service, refresh]);
+
+  useEffect(() => {
+    void start();
+  }, [start]);
 
   useEffect(() => {
     const timer = window.setInterval(() => setClockNow(new Date()), 30_000);
@@ -216,21 +236,40 @@ export function App() {
   };
 
   const exportBackup = async () => {
-    const backup = await service.exportBackup();
-    const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement('a');
-    anchor.href = url;
-    anchor.download = `ritmo-backup-${toISODate(new Date())}.json`;
-    anchor.click();
-    URL.revokeObjectURL(url);
+    try {
+      const backup = await service.exportBackup();
+      const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = `ritmo-backup-${toISODate(new Date())}.json`;
+      anchor.click();
+      URL.revokeObjectURL(url);
+    } catch (cause) {
+      setError(describeError(cause));
+    }
   };
 
   const importBackup = async (file?: File) => {
     if (!file) return;
-    const payload = JSON.parse(await file.text());
-    await service.importBackup(payload);
-    await refresh('life');
+
+    try {
+      // Parse and validate first, so a broken file is rejected before the
+      // user is asked to give up what they already have.
+      const payload = parseBackup(JSON.parse(await file.text()));
+
+      const confirmed = window.confirm(
+        `Restore ${describeBackup(payload)}?\n\n`
+        + 'This replaces everything currently stored on this device.'
+      );
+      if (!confirmed) return;
+
+      await service.importBackup(payload);
+      setDataMenuOpen(false);
+      await refresh('life');
+    } catch (cause) {
+      setError(describeError(cause));
+    }
   };
 
   const installApp = async () => {
@@ -261,7 +300,16 @@ export function App() {
       </header>
 
       <main className={busy ? 'loading' : ''}>
-        {busy && !data && (
+        {error && (
+          <div className="error-banner" role="alert">
+            <div>
+              <strong>Something went wrong</strong>
+              <span>{error}</span>
+            </div>
+            <button onClick={() => void (data ? refresh(view) : start())}>Retry</button>
+          </div>
+        )}
+        {busy && !data && !error && (
           <div className="screen-loader" role="status" aria-live="polite">
             <span />
             <small>Loading</small>
@@ -906,7 +954,11 @@ export function App() {
                     hidden
                     type="file"
                     accept="application/json"
-                    onChange={(event) => void importBackup(event.target.files?.[0])}
+                    onChange={(event) => {
+                      const file = event.target.files?.[0];
+                      event.target.value = '';
+                      void importBackup(file);
+                    }}
                   />
                 </div>
               </EditorSheet>
@@ -1172,6 +1224,11 @@ function NavIcon({ type }: { type: 'today' | 'week' | 'life' }) {
       <path d="m4 12 8 4 8-4M4 16l8 4 8-4" />
     </svg>
   );
+}
+
+function describeError(cause: unknown) {
+  if (cause instanceof Error && cause.message) return cause.message;
+  return 'Unexpected error. Your data has not been changed.';
 }
 
 function formatSchedule(days: number[]) {
