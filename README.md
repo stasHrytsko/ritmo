@@ -81,3 +81,18 @@ src/
 ```
 
 The code is intentionally prepared for future storage migration/sync while keeping V1 small and personal.
+
+
+## Mobile navigation
+
+V1 is intentionally mobile-first and has three permanent bottom sections:
+
+- **Today** — current day with Goals and Routine
+- **Week** — progress with Week / Month / Year switch
+- **Life** — Routine / Goals editor and list
+
+## Install as PWA
+
+Ritmo ships with a web app manifest, service worker, 192×192 and 512×512 icons, an Apple touch icon, standalone display mode and mobile safe-area support.
+
+On Android/Chrome use **Install app / Add to Home screen**. On iPhone open Ritmo in Safari → **Share** → **Add to Home Screen**.

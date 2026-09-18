@@ -3,22 +3,52 @@ import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 
 export default defineConfig({
+  base: './',
   plugins: [
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['icon.svg'],
+      includeAssets: [
+        'icon.svg',
+        'icon-192.png',
+        'icon-512.png',
+        'apple-touch-icon.png'
+      ],
       manifest: {
+        id: './',
         name: 'Ritmo',
         short_name: 'Ritmo',
         description: 'Personal routine and goal tracker.',
         theme_color: '#f3efe6',
         background_color: '#f3efe6',
         display: 'standalone',
-        start_url: '/',
+        orientation: 'portrait-primary',
+        start_url: './',
+        scope: './',
         icons: [
-          { src: '/icon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any maskable' }
+          {
+            src: './icon-192.png',
+            sizes: '192x192',
+            type: 'image/png',
+            purpose: 'any'
+          },
+          {
+            src: './icon-512.png',
+            sizes: '512x512',
+            type: 'image/png',
+            purpose: 'any'
+          },
+          {
+            src: './icon-512.png',
+            sizes: '512x512',
+            type: 'image/png',
+            purpose: 'maskable'
+          }
         ]
+      },
+      workbox: {
+        cleanupOutdatedCaches: true,
+        navigateFallback: 'index.html'
       }
     })
   ]

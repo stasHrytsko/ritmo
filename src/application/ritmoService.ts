@@ -100,6 +100,7 @@ export class RitmoService {
     const current = (await this.repos.completions.listByDate(dateKey))
       .find((item) => item.routineId === routineId);
     const done = !(current?.done === true);
+
     await this.repos.completions.put({
       id: `${dateKey}:${routineId}`,
       date: dateKey,
@@ -196,8 +197,9 @@ export class RitmoService {
     const week = await this.ensureWeek(date);
     const completions = await this.repos.completions.listBetween(week.startDate, week.endDate);
     const tasks = await this.repos.goalTasks.listByWeek(week.id);
-    const goals = await this.repos.goals.list();
+    const goals = (await this.repos.goals.list()).filter((goal) => goal.status !== 'paused');
     const goalMap = new Map(goals.map((goal) => [goal.id, goal]));
+
     const days = Array.from({ length: 7 }, (_, index) => {
       const day = addDays(fromISODate(week.startDate), index);
       const key = toISODate(day);
@@ -215,10 +217,54 @@ export class RitmoService {
       };
     });
 
+    const routineProgress = week.routinePlanSnapshot
+      .filter((routine) => routine.active)
+      .map((routine) => {
+        const state = Array.from({ length: 7 }, (_, index) => {
+          const day = addDays(fromISODate(week.startDate), index);
+          const key = toISODate(day);
+          const scheduled = routine.weekdays.includes(((day.getDay() + 6) % 7) + 1);
+          const done = completions.some(
+            (item) => item.date === key && item.routineId === routine.routineId && item.done
+          );
+          return { date: day, scheduled, done };
+        });
+        const scheduledDays = state.filter((item) => item.scheduled);
+        return {
+          routine,
+          days: state,
+          done: scheduledDays.filter((item) => item.done).length,
+          total: scheduledDays.length
+        };
+      });
+
+    const goalProgress = goals
+      .map((goal) => {
+        const goalTasks = tasks.filter((task) => task.goalId === goal.id);
+        return {
+          goal,
+          tasks: goalTasks,
+          done: goalTasks.filter((task) => task.status === 'done').length,
+          total: goalTasks.length
+        };
+      })
+      .filter((item) => item.total > 0);
+
+    const routineDone = routineProgress.reduce((sum, item) => sum + item.done, 0);
+    const routineTotal = routineProgress.reduce((sum, item) => sum + item.total, 0);
+    const goalDone = goalProgress.reduce((sum, item) => sum + item.done, 0);
+    const goalTotal = goalProgress.reduce((sum, item) => sum + item.total, 0);
+
     return {
       week,
       label: formatRange(fromISODate(week.startDate), fromISODate(week.endDate)),
       days,
+      routineProgress,
+      goalProgress,
+      routineDone,
+      routineTotal,
+      goalDone,
+      goalTotal,
       tasks: tasks.map((task) => ({ task, goal: goalMap.get(task.goalId) }))
     };
   }
@@ -234,11 +280,13 @@ export class RitmoService {
     });
     const allCompletions = await this.repos.completions.list();
     const today = new Date();
+
     const days = Array.from({ length: daysInMonth(year, month) }, (_, index) => {
       const day = new Date(year, month, index + 1);
       const key = toISODate(day);
       const week = weeks.find((item) => key >= item.startDate && key <= item.endDate);
       if (!week || day > today) return { date: day, medal: false, known: false };
+
       const states = getRoutineDayStates(
         week.routinePlanSnapshot,
         allCompletions.filter((item) => item.date === key),
@@ -249,10 +297,13 @@ export class RitmoService {
 
     const goals = await this.repos.goals.list();
     const tasks = await this.repos.goalTasks.list();
+
     return {
       date,
       name: monthName(date),
       days,
+      medalCount: days.filter((day) => day.medal).length,
+      knownDays: days.filter((day) => day.known).length,
       goals: goals.map((goal) => {
         const goalTasks = tasks.filter((task) => task.goalId === goal.id);
         return {
@@ -269,15 +320,19 @@ export class RitmoService {
     const weeks = (await this.repos.weeks.list()).filter((week) => week.year === year);
     const completions = await this.repos.completions.list();
     const today = new Date();
+
     const months = Array.from({ length: 12 }, (_, month) => {
       let medals = 0;
       let knownDays = 0;
+
       for (let day = 1; day <= daysInMonth(year, month); day += 1) {
         const current = new Date(year, month, day);
         if (current > today) continue;
+
         const key = toISODate(current);
         const week = weeks.find((item) => key >= item.startDate && key <= item.endDate);
         if (!week) continue;
+
         knownDays += 1;
         const states = getRoutineDayStates(
           week.routinePlanSnapshot,
@@ -286,6 +341,7 @@ export class RitmoService {
         );
         if (hasDayMedal(states)) medals += 1;
       }
+
       return {
         month,
         label: monthName(new Date(year, month, 1), 'short'),
