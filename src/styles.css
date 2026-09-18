@@ -1253,3 +1253,77 @@ input {
 .goal-task-list {
   padding-bottom: 2px;
 }
+
+
+.quarters-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.quarter-card {
+  padding: 13px;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: rgba(255, 255, 255, .28);
+}
+
+.quarter-card.current {
+  border-color: rgba(244, 91, 36, .45);
+}
+
+.quarter-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.quarter-header > div:first-child {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.quarter-header strong {
+  font-size: 20px;
+  letter-spacing: -.04em;
+}
+
+.quarter-header span {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 650;
+}
+
+.quarter-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 1px;
+}
+
+.quarter-meta b {
+  font-size: 16px;
+}
+
+.quarter-meta span {
+  color: var(--muted);
+  font-size: 9px;
+}
+
+.quarter-months {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.quarter-progress {
+  margin-top: 9px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 9px;
+}
