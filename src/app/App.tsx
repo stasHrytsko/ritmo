@@ -32,6 +32,8 @@ export function App() {
   const [lifeTab, setLifeTab] = useState<LifeTab>('routines');
   const [editorOpen, setEditorOpen] = useState(false);
   const [dataMenuOpen, setDataMenuOpen] = useState(false);
+  const [todaySections, setTodaySections] = useState({ goals: true, routine: true });
+  const [openGoals, setOpenGoals] = useState<Record<string, boolean>>({});
   const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [routineDraft, setRoutineDraft] = useState<{ id?: string; name: string; weekdays: number[] }>({
     name: '',
@@ -244,59 +246,92 @@ export function App() {
               </div>
             )}
 
-            <section className="content-block">
-              <SectionHeader
+            <section className={`content-block accordion-block ${todaySections.goals ? 'expanded' : 'collapsed'}`}>
+              <AccordionHeader
                 title="Goals"
                 meta={String(data.goals.reduce((sum: number, item: any) => sum + item.tasks.length, 0))}
+                open={todaySections.goals}
+                onToggle={() => setTodaySections((current) => ({ ...current, goals: !current.goals }))}
               />
-              <div className="stack compact">
-                {data.goals.map((group: any) => (
-                  <article className="goal-today" key={group.goal.id}>
-                    <div className="goal-title">{group.goal.name}</div>
-                    {group.tasks.map((task: GoalTask) => (
+
+              {todaySections.goals && (
+                <div className="stack compact accordion-content">
+                  {data.goals.map((group: any) => {
+                    const goalOpen = openGoals[group.goal.id] ?? true;
+                    const doneCount = group.tasks.filter((task: GoalTask) => task.status === 'done').length;
+
+                    return (
+                      <article className={`goal-today nested-accordion ${goalOpen ? 'expanded' : 'collapsed'}`} key={group.goal.id}>
+                        <button
+                          className="goal-accordion-header"
+                          aria-expanded={goalOpen}
+                          onClick={() => setOpenGoals((current) => ({
+                            ...current,
+                            [group.goal.id]: !goalOpen
+                          }))}
+                        >
+                          <span className="goal-accordion-copy">
+                            <strong>{group.goal.name}</strong>
+                            <small>{doneCount}/{group.tasks.length} tasks</small>
+                          </span>
+                          <span className={`accordion-chevron ${goalOpen ? 'open' : ''}`}>⌄</span>
+                        </button>
+
+                        {goalOpen && (
+                          <div className="goal-task-list">
+                            {group.tasks.map((task: GoalTask) => (
+                              <button
+                                key={task.id}
+                                className={`check-row ${task.status === 'done' ? 'done' : ''}`}
+                                onClick={async () => {
+                                  await service.toggleGoalTask(task);
+                                  await refresh('day');
+                                }}
+                              >
+                                <span className="check-circle">{task.status === 'done' ? '✓' : ''}</span>
+                                <span>{task.title}</span>
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </article>
+                    );
+                  })}
+                  {data.goals.length === 0 && <Empty text="No goal tasks for today." />}
+                </div>
+              )}
+            </section>
+
+            <section className={`content-block accordion-block ${todaySections.routine ? 'expanded' : 'collapsed'}`}>
+              <AccordionHeader
+                title="Routine"
+                meta={`${data.routines.filter((item: any) => item.scheduled && item.done).length}/${data.routines.filter((item: any) => item.scheduled).length}`}
+                open={todaySections.routine}
+                onToggle={() => setTodaySections((current) => ({ ...current, routine: !current.routine }))}
+              />
+
+              {todaySections.routine && (
+                <div className="stack compact accordion-content">
+                  {data.routines
+                    .filter((state: any) => state.scheduled)
+                    .map((state: any) => (
                       <button
-                        key={task.id}
-                        className={`check-row ${task.status === 'done' ? 'done' : ''}`}
+                        key={state.routine.routineId}
+                        className={`check-row ${state.done ? 'done' : ''}`}
                         onClick={async () => {
-                          await service.toggleGoalTask(task);
+                          await service.toggleRoutine(data.date, state.routine.routineId);
                           await refresh('day');
                         }}
                       >
-                        <span className="check-circle">{task.status === 'done' ? '✓' : ''}</span>
-                        <span>{task.title}</span>
+                        <span className="check-circle">{state.done ? '✓' : ''}</span>
+                        <span>{state.routine.name}</span>
                       </button>
                     ))}
-                  </article>
-                ))}
-                {data.goals.length === 0 && <Empty text="No goal tasks for today." />}
-              </div>
-            </section>
-
-            <section className="content-block">
-              <SectionHeader
-                title="Routine"
-                meta={`${data.routines.filter((item: any) => item.scheduled && item.done).length}/${data.routines.filter((item: any) => item.scheduled).length}`}
-              />
-              <div className="stack compact">
-                {data.routines
-                  .filter((state: any) => state.scheduled)
-                  .map((state: any) => (
-                    <button
-                      key={state.routine.routineId}
-                      className={`check-row ${state.done ? 'done' : ''}`}
-                      onClick={async () => {
-                        await service.toggleRoutine(data.date, state.routine.routineId);
-                        await refresh('day');
-                      }}
-                    >
-                      <span className="check-circle">{state.done ? '✓' : ''}</span>
-                      <span>{state.routine.name}</span>
-                    </button>
-                  ))}
-                {data.routines.filter((state: any) => state.scheduled).length === 0 && (
-                  <Empty text="No routines scheduled for today." />
-                )}
-              </div>
+                  {data.routines.filter((state: any) => state.scheduled).length === 0 && (
+                    <Empty text="No routines scheduled for today." />
+                  )}
+                </div>
+              )}
             </section>
           </section>
         )}
@@ -756,6 +791,28 @@ export function App() {
         />
       </footer>
     </div>
+  );
+}
+
+function AccordionHeader({
+  title,
+  meta,
+  open,
+  onToggle
+}: {
+  title: string;
+  meta: string;
+  open: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <button className="accordion-header" aria-expanded={open} onClick={onToggle}>
+      <h2>{title}</h2>
+      <span className="accordion-header-right">
+        <b>{meta}</b>
+        <i className={`accordion-chevron ${open ? 'open' : ''}`}>⌄</i>
+      </span>
+    </button>
   );
 }
 
