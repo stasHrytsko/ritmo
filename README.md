@@ -88,7 +88,7 @@ The code is intentionally prepared for future storage migration/sync while keepi
 V1 is intentionally mobile-first and has three permanent bottom sections:
 
 - **Today** — current day with Goals and Routine
-- **Week** — progress with Week / Month / Year switch
+- **Progress** — progress with Week / Month / Year switch
 - **Life** — Routine / Goals editor and list
 
 ## Install as PWA
