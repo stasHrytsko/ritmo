@@ -76,6 +76,8 @@ export function App() {
   }, []);
 
   const navigate = (target: View) => {
+    if (target === view) return;
+    setData(null);
     setView(target);
     setEditorOpen(false);
     void refresh(target);
@@ -193,6 +195,12 @@ export function App() {
       </header>
 
       <main className={busy ? 'loading' : ''}>
+        {busy && !data && (
+          <div className="screen-loader" role="status" aria-live="polite">
+            <span />
+            <small>Loading</small>
+          </div>
+        )}
         {view === 'day' && data && (
           <section className="screen today-screen">
             <div className="date-hero">
@@ -280,7 +288,7 @@ export function App() {
 
         {isProgressView && data && (
           <section className="screen progress-screen">
-            {view === 'week' && (
+            {view === 'week' && data.week && (
               <>
                 <div className="progress-heading">
                   <div>
@@ -352,7 +360,7 @@ export function App() {
               </>
             )}
 
-            {view === 'month' && (
+            {view === 'month' && data.date && Array.isArray(data.days) && (
               <>
                 <div className="eyebrow">{data.date.getFullYear()}</div>
                 <h1>{data.name}</h1>
@@ -408,7 +416,7 @@ export function App() {
               </>
             )}
 
-            {view === 'year' && (
+            {view === 'year' && typeof data.year === 'number' && Array.isArray(data.months) && (
               <>
                 <div className="eyebrow">Year</div>
                 <div className="year-title">
@@ -448,7 +456,7 @@ export function App() {
           </section>
         )}
 
-        {view === 'life' && data && (
+        {view === 'life' && data && Array.isArray(data.routines) && Array.isArray(data.goals) && (
           <section className="screen life-screen">
             <div className="eyebrow">Edit</div>
             <h1>Life</h1>
