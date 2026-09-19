@@ -14,6 +14,21 @@
     <link rel="apple-touch-icon" href="./apple-touch-icon.png" />
 
     <title>Ritmo</title>
+
+    <script>
+      // Applied before the first paint so a stored theme does not flash the
+      // other one while the app boots. Mirrors src/app/theme.ts.
+      try {
+        var saved = localStorage.getItem('ritmo:theme');
+        if (saved === 'light' || saved === 'dark') {
+          document.documentElement.dataset.theme = saved;
+          var color = saved === 'dark' ? '#14130f' : '#f3efe6';
+          document.querySelectorAll('meta[name="theme-color"]').forEach(function (meta) {
+            meta.content = color;
+          });
+        }
+      } catch (error) { /* storage blocked: fall back to the system theme */ }
+    </script>
   </head>
   <body>
     <div id="root"></div>

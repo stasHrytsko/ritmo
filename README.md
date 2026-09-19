@@ -23,7 +23,7 @@ It separates two kinds of progress:
 - JSON backup/export and restore/import, validated before it replaces anything
 - Installable PWA
 - Offline-first storage with IndexedDB
-- Light and dark themes, following the system setting
+- Light and dark themes: System, Light or Dark, under Life → Appearance
 
 ## Architecture
 
@@ -59,6 +59,14 @@ Checks (lint, types, tests) — the same set CI runs:
 ```bash
 npm run check
 ```
+
+## Themes
+
+Life → Appearance switches between System, Light and Dark. The choice is a
+per-device display preference, so it lives in browser storage rather than in
+the app database — restoring a backup taken on a phone should not repaint a
+laptop. An inline script in `index.html` applies it before the first paint,
+so a stored theme never flashes the other one on load.
 
 ## The day boundary
 

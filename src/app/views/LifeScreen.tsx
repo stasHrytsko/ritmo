@@ -4,6 +4,7 @@ import type { Goal, GoalTask, Routine } from '../../domain/types';
 import { addDays, toISODate } from '../../domain/time';
 import { EditorSheet } from '../components/EditorSheet';
 import { Empty } from '../components/ui';
+import { THEME_PREFERENCES, useThemePreference, type ThemePreference } from '../theme';
 
 type LifeTab = 'routines' | 'goals';
 
@@ -407,6 +408,10 @@ export function LifeScreen({
         </EditorSheet>
       )}
 
+      <section className="utility-section">
+        <ThemePicker />
+      </section>
+
       {showInstallSection && (
         <section className="utility-section">
           {installPrompt && (
@@ -448,6 +453,35 @@ export function LifeScreen({
         </EditorSheet>
       )}
     </section>
+  );
+}
+
+const THEME_LABELS: Record<ThemePreference, string> = {
+  system: 'System',
+  light: 'Light',
+  dark: 'Dark'
+};
+
+function ThemePicker() {
+  const [preference, choose] = useThemePreference();
+
+  return (
+    <div className="field theme-field">
+      <span id="theme-label">Appearance</span>
+      <div className="timing-picker theme-picker" role="group" aria-labelledby="theme-label">
+        {THEME_PREFERENCES.map((option) => (
+          <button
+            type="button"
+            key={option}
+            className={preference === option ? 'active' : ''}
+            aria-pressed={preference === option}
+            onClick={() => choose(option)}
+          >
+            {THEME_LABELS[option]}
+          </button>
+        ))}
+      </div>
+    </div>
   );
 }
 

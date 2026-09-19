@@ -1601,8 +1601,51 @@ input {
   font-weight: 600;
 }
 
+/*
+ * Dark palette. Declared twice on purpose: once for an explicit choice and
+ * once for the system setting, which a stored choice of "light" overrides.
+ * CSS has no way to share one declaration block between the two.
+ */
+:root[data-theme="dark"] {
+  --bg: #14130f;
+  --surface: #1b1914;
+  --surface-strong: #221f19;
+  --ink: #f1ece1;
+  --muted: #9c958a;
+  --line: #2c2921;
+  --line-strong: #3d382e;
+  --accent: #ff6a35;
+  --on-ink: #14130f;
+
+  --ink-faint: #7d7668;
+  --track: #302b23;
+  --inset: #1f1c16;
+  --chip-off: #2d2921;
+  --chip-ink: #6e685d;
+  --chip-line: #514a3d;
+  --danger: #ff7f61;
+  --scrim: rgba(0, 0, 0, .62);
+  --handle: #454036;
+  --sheet-btn: #2a2620;
+  --nav-bg: rgba(20, 19, 15, .94);
+  --frame: #0e0d0a;
+  --veil: rgba(255, 255, 255, .045);
+  --veil-strong: rgba(255, 255, 255, .07);
+  --veil-weak: rgba(255, 255, 255, .03);
+  --timeline-axis-color: #332f27;
+  --timeline-dot-color: #5d5749;
+  --timeline-task-bg: rgba(255, 255, 255, .05);
+  --check-line: #5d5749;
+  --accent-ring: rgba(255, 106, 53, .5);
+  --raise: 0 1px 6px rgba(0, 0, 0, .45);
+  --raise-sm: 0 1px 5px rgba(0, 0, 0, .45);
+  --sheet-shadow: 0 -16px 60px rgba(0, 0, 0, .55);
+  --frame-shadow: 0 0 60px rgba(0, 0, 0, .5);
+  color-scheme: dark;
+}
+
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     --bg: #14130f;
     --surface: #1b1914;
     --surface-strong: #221f19;
@@ -1638,10 +1681,24 @@ input {
     --sheet-shadow: 0 -16px 60px rgba(0, 0, 0, .55);
     --frame-shadow: 0 0 60px rgba(0, 0, 0, .5);
     color-scheme: dark;
+  
   }
 }
 
 /* Days that have not happened yet are shown, but muted. */
 .week-strip .future {
   opacity: .45;
+}
+
+.theme-field {
+  margin: 0;
+}
+
+/* Three options rather than the two .timing-picker is sized for. */
+.theme-picker {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.theme-picker button {
+  min-width: 0;
 }
