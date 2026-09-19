@@ -4,6 +4,7 @@ import type {
   Goal,
   GoalTask,
   Note,
+  NoteEntry,
   Routine,
   RoutineCompletion,
   WeekRecord
@@ -14,6 +15,7 @@ export interface MemoryStore {
   goals: Goal[];
   goalTasks: GoalTask[];
   notes: Note[];
+  noteEntries: NoteEntry[];
   weeks: WeekRecord[];
   completions: RoutineCompletion[];
   settings?: AppSettings;
@@ -22,7 +24,7 @@ export interface MemoryStore {
 /** In-memory repositories for tests. Mirrors the Dexie adapter's cascades. */
 export function createMemoryRepositories(): { repos: Repositories; store: MemoryStore } {
   const store: MemoryStore = {
-    routines: [], goals: [], goalTasks: [], notes: [], weeks: [], completions: []
+    routines: [], goals: [], goalTasks: [], notes: [], noteEntries: [], weeks: [], completions: []
   };
 
   const put = <T extends { id: string }>(list: T[], item: T) => {
@@ -72,7 +74,17 @@ export function createMemoryRepositories(): { repos: Repositories; store: Memory
       list: async () => [...store.notes],
       create: async (note) => { store.notes.push(note); },
       update: async (note) => put(store.notes, note),
-      remove: async (id) => drop(store.notes, (item) => item.id === id)
+      remove: async (id) => {
+        drop(store.notes, (item) => item.id === id);
+        drop(store.noteEntries, (item) => item.noteId === id);
+      }
+    },
+    noteEntries: {
+      list: async () => [...store.noteEntries],
+      listByNote: async (noteId) => store.noteEntries.filter((item) => item.noteId === noteId),
+      create: async (entry) => { store.noteEntries.push(entry); },
+      update: async (entry) => put(store.noteEntries, entry),
+      remove: async (id) => drop(store.noteEntries, (item) => item.id === id)
     },
     weeks: {
       get: async (id) => store.weeks.find((item) => item.id === id),

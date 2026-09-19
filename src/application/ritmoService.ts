@@ -3,6 +3,7 @@ import {
   type Goal,
   type GoalTask,
   type Note,
+  type NoteEntry,
   type Routine,
   type RoutineSnapshot,
   type WeekRecord
@@ -46,7 +47,6 @@ export interface TodayView {
   medal: boolean;
   week: DayStrip[];
   goals: Array<{ goal: Goal; tasks: GoalTask[] }>;
-  notes: Note[];
   daysLeft: number;
   weeksLeft: number;
 }
@@ -99,12 +99,14 @@ export interface LifeView {
   tasks: GoalTask[];
 }
 
-/** Still to do on top, newest first; anything ticked off sinks below. */
-export const sortNotes = (notes: Note[]): Note[] =>
-  [...notes].sort((a, b) => {
-    if (a.status !== b.status) return a.status === 'open' ? -1 : 1;
-    return b.createdAt.localeCompare(a.createdAt);
-  });
+export interface NoteWithEntries {
+  note: Note;
+  entries: NoteEntry[];
+}
+
+export interface NotesView {
+  notes: NoteWithEntries[];
+}
 
 export class RitmoService {
   private booting?: Promise<void>;
@@ -240,7 +242,6 @@ export class RitmoService {
 
     const goals = (await this.repos.goals.list()).filter((goal) => goal.status === 'active');
     const weekTasks = await this.repos.goalTasks.listByWeek(week.id);
-    const notes = await this.repos.notes.list();
 
     return {
       date,
@@ -255,7 +256,6 @@ export class RitmoService {
           )
         }))
         .filter((item) => item.tasks.length > 0),
-      notes: sortNotes(notes),
       daysLeft: daysLeftInYear(date),
       weeksLeft: weeksLeftInYear(date)
     };
@@ -410,32 +410,73 @@ export class RitmoService {
     });
   }
 
-  async addNote(text: string) {
+  async getNotes(): Promise<NotesView> {
+    const [notes, entries] = await Promise.all([
+      this.repos.notes.list(),
+      this.repos.noteEntries.list()
+    ]);
+
+    // Newest note first; entries stay in the order they were written.
+    return {
+      notes: [...notes]
+        .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+        .map((note) => ({
+          note,
+          entries: entries
+            .filter((entry) => entry.noteId === note.id)
+            .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+        }))
+    };
+  }
+
+  async createNote(title: string) {
+    const trimmed = title.trim();
+    if (!trimmed) return;
+
+    const stamp = now();
+    await this.repos.notes.create({ id: id(), title: trimmed, createdAt: stamp, updatedAt: stamp });
+  }
+
+  async renameNote(note: Note, title: string) {
+    const trimmed = title.trim();
+    if (!trimmed || trimmed === note.title) return;
+    await this.repos.notes.update({ ...note, title: trimmed, updatedAt: now() });
+  }
+
+  async deleteNote(noteId: string) {
+    await this.repos.notes.remove(noteId);
+  }
+
+  async addNoteEntry(noteId: string, text: string) {
     const trimmed = text.trim();
     if (!trimmed) return;
 
     const stamp = now();
-    await this.repos.notes.create({
+    await this.repos.noteEntries.create({
       id: id(),
+      noteId,
       text: trimmed,
-      status: 'open',
       createdAt: stamp,
       updatedAt: stamp
     });
   }
 
-  async toggleNote(note: Note) {
-    const done = note.status !== 'done';
-    await this.repos.notes.update({
-      ...note,
-      status: done ? 'done' : 'open',
-      completedAt: done ? now() : undefined,
-      updatedAt: now()
-    });
+  async updateNoteEntry(entry: NoteEntry, text: string) {
+    const trimmed = text.trim();
+    if (!trimmed || trimmed === entry.text) return;
+    await this.repos.noteEntries.update({ ...entry, text: trimmed, updatedAt: now() });
   }
 
-  async deleteNote(noteId: string) {
-    await this.repos.notes.remove(noteId);
+  async deleteNoteEntry(entryId: string) {
+    await this.repos.noteEntries.remove(entryId);
+  }
+
+  /**
+   * Turns an entry into a goal. The entry stays on its note: adding to goals
+   * copies it rather than moving it.
+   */
+  async addEntryToGoals(entry: NoteEntry, startDate: string, endDate: string) {
+    await this.createGoal(entry.text, startDate, endDate);
   }
 
   async getWeek(at = new Date()): Promise<WeekView> {

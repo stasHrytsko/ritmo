@@ -1,4 +1,4 @@
-export type NavIconType = 'today' | 'week' | 'life';
+export type NavIconType = 'today' | 'week' | 'life' | 'notes';
 
 function NavIcon({ type }: { type: NavIconType }) {
   if (type === 'today') {
@@ -18,10 +18,19 @@ function NavIcon({ type }: { type: NavIconType }) {
     );
   }
 
+  if (type === 'life') {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="m12 4 8 4-8 4-8-4 8-4Z" />
+        <path d="m4 12 8 4 8-4M4 16l8 4 8-4" />
+      </svg>
+    );
+  }
+
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true">
-      <path d="m12 4 8 4-8 4-8-4 8-4Z" />
-      <path d="m4 12 8 4 8-4M4 16l8 4 8-4" />
+      <rect x="5" y="3" width="14" height="18" rx="2" />
+      <path d="M9 8h6M9 12h6M9 16h3" />
     </svg>
   );
 }

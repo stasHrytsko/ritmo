@@ -16,6 +16,9 @@ export class BackupValidationError extends Error {
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
 
+const firstText = (...values: unknown[]) =>
+  values.find((value) => typeof value === 'string' && value.trim() !== '');
+
 const requireArray = (payload: Record<string, unknown>, key: string): Record<string, unknown>[] => {
   const value = payload[key];
   if (!Array.isArray(value)) {
@@ -107,8 +110,27 @@ export const parseBackup = (raw: unknown): BackupPayload => {
     'date',
     'routineId'
   ]);
-  // Notes arrived in v4; a v1-v3 file simply has none.
-  const notes = requireFields(optionalArray(raw, 'notes'), 'notes', ['id', 'text']);
+  // Notes arrived in v4 as flat text and became titled lists in v5, so a
+  // note's own wording may be under either key. Older files have none at all.
+  const notes = optionalArray(raw, 'notes').map((note) => ({
+    ...note,
+    title: firstText(note.title, note.text)
+  }));
+  requireFields(notes, 'notes', ['id', 'title']);
+  const noteEntries = requireFields(optionalArray(raw, 'noteEntries'), 'noteEntries', [
+    'id',
+    'noteId',
+    'text'
+  ]);
+
+  // Drop the fields a v4 note carried; a note is just a title now.
+  const titledNotes = notes.map((note): Record<string, unknown> => {
+    const rest: Record<string, unknown> = { ...note };
+    delete rest.text;
+    delete rest.status;
+    delete rest.completedAt;
+    return rest;
+  });
   const settings = requireFields(requireArray(raw, 'settings'), 'settings', ['key']);
 
   return {
@@ -119,10 +141,8 @@ export const parseBackup = (raw: unknown): BackupPayload => {
     goalTasks: goalTasks as unknown as BackupPayload['goalTasks'],
     weeks: weeks.map(normalizeWeek),
     completions: completions as unknown as BackupPayload['completions'],
-    notes: notes.map((note) => ({
-      ...note,
-      status: note.status === 'done' ? 'done' : 'open'
-    })) as unknown as BackupPayload['notes'],
+    notes: titledNotes as unknown as BackupPayload['notes'],
+    noteEntries: noteEntries as unknown as BackupPayload['noteEntries'],
     settings: settings.map((item) => ({
       ...item,
       schemaVersion: SCHEMA_VERSION

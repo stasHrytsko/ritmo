@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { GoalTask, Note } from '../domain/types';
+import type { GoalTask } from '../domain/types';
 import { logicalDayKey, toISODate } from '../domain/time';
 import { describeBackup, parseBackup } from '../domain/backup';
 import { repositories } from '../infrastructure/repositories';
@@ -7,6 +7,7 @@ import {
   RitmoService,
   type LifeView,
   type MonthView,
+  type NotesView,
   type TodayView,
   type WeekView,
   type YearView
@@ -16,8 +17,9 @@ import type { PeriodView } from './components/ui';
 import { TodayScreen } from './views/TodayScreen';
 import { ProgressScreen } from './views/ProgressScreen';
 import { LifeScreen, type BeforeInstallPromptEvent } from './views/LifeScreen';
+import { NotesScreen } from './views/NotesScreen';
 
-type View = 'day' | PeriodView | 'life';
+type View = 'day' | PeriodView | 'life' | 'notes';
 
 /**
  * One screen's data, tied to the view it belongs to. The union is what lets
@@ -28,10 +30,13 @@ type Screen =
   | { view: 'week'; data: WeekView }
   | { view: 'month'; data: MonthView }
   | { view: 'year'; data: YearView }
-  | { view: 'life'; data: LifeView };
+  | { view: 'life'; data: LifeView }
+  | { view: 'notes'; data: NotesView };
 
 const isProgress = (view: View): view is PeriodView =>
   view === 'week' || view === 'month' || view === 'year';
+
+const TOPBAR_LABELS: Partial<Record<View, string>> = { day: 'Today', notes: 'Notes' };
 
 export function App() {
   const service = useMemo(() => new RitmoService(repositories), []);
@@ -51,6 +56,7 @@ export function App() {
     if (target === 'week') return { view: 'week', data: await service.getWeek() };
     if (target === 'month') return { view: 'month', data: await service.getMonth() };
     if (target === 'year') return { view: 'year', data: await service.getYear() };
+    if (target === 'notes') return { view: 'notes', data: await service.getNotes() };
     return { view: 'life', data: await service.getLife() };
   }, [service]);
 
@@ -186,7 +192,7 @@ export function App() {
             ⋯
           </button>
         ) : (
-          <div className="topbar-mark">{view === 'day' ? 'Today' : 'Progress'}</div>
+          <div className="topbar-mark">{TOPBAR_LABELS[view] ?? 'Progress'}</div>
         )}
       </header>
 
@@ -212,18 +218,6 @@ export function App() {
             data={screen.data}
             onToggleRoutine={toggleRoutine}
             onToggleTask={toggleTask}
-            onAddNote={async (text) => {
-              await service.addNote(text);
-              await refresh('day');
-            }}
-            onToggleNote={async (note) => {
-              await service.toggleNote(note);
-              await refresh('day');
-            }}
-            onDeleteNote={async (note: Note) => {
-              await service.deleteNote(note.id);
-              await refresh('day');
-            }}
           />
         )}
 
@@ -235,6 +229,40 @@ export function App() {
         )}
         {screen?.view === 'year' && (
           <ProgressScreen screen={{ view: 'year', data: screen.data }} onChange={navigate} />
+        )}
+
+        {screen?.view === 'notes' && (
+          <NotesScreen
+            data={screen.data}
+            onCreateNote={async (title) => {
+              await service.createNote(title);
+              await refresh('notes');
+            }}
+            onRenameNote={async (note, title) => {
+              await service.renameNote(note, title);
+              await refresh('notes');
+            }}
+            onDeleteNote={async (noteId) => {
+              await service.deleteNote(noteId);
+              await refresh('notes');
+            }}
+            onAddEntry={async (noteId, text) => {
+              await service.addNoteEntry(noteId, text);
+              await refresh('notes');
+            }}
+            onUpdateEntry={async (entry, text) => {
+              await service.updateNoteEntry(entry, text);
+              await refresh('notes');
+            }}
+            onDeleteEntry={async (entryId) => {
+              await service.deleteNoteEntry(entryId);
+              await refresh('notes');
+            }}
+            onAddEntryToGoals={async (entry, startDate, endDate) => {
+              await service.addEntryToGoals(entry, startDate, endDate);
+              await refresh('notes');
+            }}
+          />
         )}
 
         {screen?.view === 'life' && (
@@ -304,6 +332,7 @@ export function App() {
           onClick={() => navigate(isProgress(view) ? view : 'week')}
         />
         <NavButton label="Life" icon="life" active={view === 'life'} onClick={() => navigate('life')} />
+        <NavButton label="Notes" icon="notes" active={view === 'notes'} onClick={() => navigate('notes')} />
       </footer>
     </div>
   );

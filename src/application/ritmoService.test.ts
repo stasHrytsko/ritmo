@@ -238,58 +238,136 @@ describe('createRoutine', () => {
 });
 
 describe('notes', () => {
-  it('adds a note as open', async () => {
-    await service.addNote('Buy a standing desk');
+  const addNote = async (title: string) => {
+    await service.createNote(title);
+    return store.notes.find((note) => note.title === title)!;
+  };
+
+  it('creates a note from a title', async () => {
+    await addNote('Home');
     expect(store.notes).toHaveLength(1);
-    expect(store.notes[0].text).toBe('Buy a standing desk');
-    expect(store.notes[0].status).toBe('open');
+    expect(store.notes[0].title).toBe('Home');
   });
 
-  it('trims the text and ignores an empty note', async () => {
-    await service.addNote('   Learn to swim   ');
-    await service.addNote('   ');
-    await service.addNote('');
+  it('trims the title and refuses an empty one', async () => {
+    await service.createNote('   Home   ');
+    await service.createNote('   ');
+    await service.createNote('');
     expect(store.notes).toHaveLength(1);
-    expect(store.notes[0].text).toBe('Learn to swim');
+    expect(store.notes[0].title).toBe('Home');
   });
 
-  it('ticks a note off and back on', async () => {
-    await service.addNote('Fix the bike');
-    await service.toggleNote(store.notes[0]);
-    expect(store.notes[0].status).toBe('done');
-    expect(store.notes[0].completedAt).toBeDefined();
-
-    await service.toggleNote(store.notes[0]);
-    expect(store.notes[0].status).toBe('open');
-    expect(store.notes[0].completedAt).toBeUndefined();
+  it('renames a note', async () => {
+    const note = await addNote('Home');
+    await service.renameNote(note, 'House');
+    expect(store.notes[0].title).toBe('House');
   });
 
-  it('deletes a note', async () => {
-    await service.addNote('Fix the bike');
-    await service.deleteNote(store.notes[0].id);
-    expect(store.notes).toHaveLength(0);
+  it('ignores a rename to nothing', async () => {
+    const note = await addNote('Home');
+    await service.renameNote(note, '   ');
+    expect(store.notes[0].title).toBe('Home');
   });
 
-  it('shows still-to-do notes first, newest at the top', async () => {
+  it('holds as many entries as you write', async () => {
+    const note = await addNote('Home');
+    await service.addNoteEntry(note.id, 'Fix the tap');
+    await service.addNoteEntry(note.id, 'Buy a desk');
+    await service.addNoteEntry(note.id, 'Paint the hallway');
+
+    const { notes } = await service.getNotes();
+    expect(notes[0].entries.map((entry) => entry.text))
+      .toEqual(['Fix the tap', 'Buy a desk', 'Paint the hallway']);
+  });
+
+  it('refuses an empty entry', async () => {
+    const note = await addNote('Home');
+    await service.addNoteEntry(note.id, '   ');
+    expect(store.noteEntries).toHaveLength(0);
+  });
+
+  it('edits an entry', async () => {
+    const note = await addNote('Home');
+    await service.addNoteEntry(note.id, 'Fix the tap');
+    await service.updateNoteEntry(store.noteEntries[0], 'Fix the kitchen tap');
+    expect(store.noteEntries[0].text).toBe('Fix the kitchen tap');
+  });
+
+  it('deletes an entry without touching its neighbours', async () => {
+    const note = await addNote('Home');
+    await service.addNoteEntry(note.id, 'Fix the tap');
+    await service.addNoteEntry(note.id, 'Buy a desk');
+
+    await service.deleteNoteEntry(store.noteEntries[0].id);
+    expect(store.noteEntries.map((entry) => entry.text)).toEqual(['Buy a desk']);
+  });
+
+  it('deletes a note together with its entries', async () => {
+    const home = await addNote('Home');
+    const work = await addNote('Work');
+    await service.addNoteEntry(home.id, 'Fix the tap');
+    await service.addNoteEntry(work.id, 'Write the deck');
+
+    await service.deleteNote(home.id);
+    expect(store.notes.map((note) => note.title)).toEqual(['Work']);
+    expect(store.noteEntries.map((entry) => entry.text)).toEqual(['Write the deck']);
+  });
+
+  it('keeps entries with their own note', async () => {
+    const home = await addNote('Home');
+    const work = await addNote('Work');
+    await service.addNoteEntry(home.id, 'Fix the tap');
+    await service.addNoteEntry(work.id, 'Write the deck');
+
+    const { notes } = await service.getNotes();
+    const byTitle = new Map(notes.map((item) => [item.note.title, item.entries]));
+    expect(byTitle.get('Home')!.map((entry) => entry.text)).toEqual(['Fix the tap']);
+    expect(byTitle.get('Work')!.map((entry) => entry.text)).toEqual(['Write the deck']);
+  });
+
+  it('lists the newest note first', async () => {
     vi.setSystemTime(new Date('2026-09-18T10:00:00+02:00'));
-    await service.addNote('Oldest');
+    await addNote('Older');
     vi.setSystemTime(new Date('2026-09-18T11:00:00+02:00'));
-    await service.addNote('Middle');
-    vi.setSystemTime(new Date('2026-09-18T12:00:00+02:00'));
-    await service.addNote('Newest');
+    await addNote('Newer');
 
-    await service.toggleNote(store.notes.find((note) => note.text === 'Newest')!);
+    const { notes } = await service.getNotes();
+    expect(notes.map((item) => item.note.title)).toEqual(['Newer', 'Older']);
+  });
+});
 
-    const { notes } = await service.getToday();
-    expect(notes.map((note) => note.text)).toEqual(['Middle', 'Oldest', 'Newest']);
+describe('adding an entry to goals', () => {
+  it('creates an active goal from the entry text and dates', async () => {
+    await service.createNote('Home');
+    const note = store.notes[0];
+    await service.addNoteEntry(note.id, 'Repaint the hallway');
+    const entry = store.noteEntries[0];
+
+    await service.addEntryToGoals(entry, '2026-10-01', '2026-12-31');
+
+    expect(store.goals).toHaveLength(1);
+    expect(store.goals[0].name).toBe('Repaint the hallway');
+    expect(store.goals[0].startDate).toBe('2026-10-01');
+    expect(store.goals[0].endDate).toBe('2026-12-31');
+    expect(store.goals[0].status).toBe('active');
   });
 
-  it('is the same list whatever day is on screen', async () => {
-    await service.addNote('Buy a standing desk');
-    expect((await service.getToday()).notes).toHaveLength(1);
+  it('leaves the entry on its note', async () => {
+    await service.createNote('Home');
+    await service.addNoteEntry(store.notes[0].id, 'Repaint the hallway');
+    await service.addEntryToGoals(store.noteEntries[0], '2026-10-01', '2026-12-31');
 
-    vi.setSystemTime(new Date('2026-11-03T10:00:00+01:00'));
-    expect((await service.getToday()).notes).toHaveLength(1);
+    expect(store.noteEntries).toHaveLength(1);
+    expect(store.noteEntries[0].text).toBe('Repaint the hallway');
+  });
+
+  it('shows up in Life like any other goal', async () => {
+    await service.createNote('Home');
+    await service.addNoteEntry(store.notes[0].id, 'Repaint the hallway');
+    await service.addEntryToGoals(store.noteEntries[0], '2026-10-01', '2026-12-31');
+
+    const life = await service.getLife();
+    expect(life.goals.map((goal) => goal.name)).toContain('Repaint the hallway');
   });
 });
 

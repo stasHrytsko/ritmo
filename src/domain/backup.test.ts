@@ -59,24 +59,48 @@ describe('parseBackup', () => {
     expect(parseBackup(payload).notes).toEqual([]);
   });
 
-  it('restores notes and normalises their status', () => {
+  it('turns a flat v4 note into a titled one and drops its old fields', () => {
     const payload = {
       ...valid(),
       schemaVersion: 4,
-      notes: [
-        { id: 'n1', text: 'Buy a desk', status: 'done' },
-        { id: 'n2', text: 'Learn to swim', status: 'open' },
-        { id: 'n3', text: 'No status at all' }
+      notes: [{ id: 'n1', text: 'Buy a desk', status: 'done', completedAt: '2026-09-18' }]
+    };
+    const [note] = parseBackup(payload).notes;
+
+    expect(note.title).toBe('Buy a desk');
+    expect(note).not.toHaveProperty('text');
+    expect(note).not.toHaveProperty('status');
+    expect(note).not.toHaveProperty('completedAt');
+  });
+
+  it('restores notes with their entries', () => {
+    const payload = {
+      ...valid(),
+      schemaVersion: 5,
+      notes: [{ id: 'n1', title: 'Home' }],
+      noteEntries: [
+        { id: 'e1', noteId: 'n1', text: 'Fix the tap' },
+        { id: 'e2', noteId: 'n1', text: 'Buy a desk' }
       ]
     };
-    const notes = parseBackup(payload).notes;
-    expect(notes.map((note) => note.status)).toEqual(['done', 'open', 'open']);
+    const restored = parseBackup(payload);
+
+    expect(restored.notes[0].title).toBe('Home');
+    expect(restored.noteEntries.map((entry) => entry.text)).toEqual(['Fix the tap', 'Buy a desk']);
+  });
+
+  it('accepts a file from before note entries existed', () => {
+    const payload = { ...valid(), schemaVersion: 4, notes: [{ id: 'n1', text: 'Home' }] };
+    expect(parseBackup(payload).noteEntries).toEqual([]);
   });
 
   it.each([
-    ['a note without text', { ...valid(), notes: [{ id: 'n1' }] }],
-    ['a note without an id', { ...valid(), notes: [{ text: 'Buy a desk' }] }],
-    ['a notes list that is not a list', { ...valid(), notes: 'nope' }]
+    ['a note with no wording at all', { ...valid(), notes: [{ id: 'n1' }] }],
+    ['a note without an id', { ...valid(), notes: [{ title: 'Home' }] }],
+    ['a notes list that is not a list', { ...valid(), notes: 'nope' }],
+    ['an entry without text', { ...valid(), noteEntries: [{ id: 'e1', noteId: 'n1' }] }],
+    ['an entry with no note', { ...valid(), noteEntries: [{ id: 'e1', text: 'Fix the tap' }] }],
+    ['an entries list that is not a list', { ...valid(), noteEntries: 'nope' }]
   ])('rejects %s', (_label, payload) => {
     expect(() => parseBackup(payload)).toThrow(BackupValidationError);
   });

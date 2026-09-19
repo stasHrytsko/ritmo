@@ -15,18 +15,30 @@ const V1_STORES = {
 
 const V2_STORES = { ...V1_STORES, routines: 'id, active, timing, time, createdAt, updatedAt' };
 const V3_STORES = V2_STORES;
+const V4_STORES = { ...V3_STORES, notes: 'id, status, createdAt, updatedAt' };
 
 afterEach(async () => {
   await Dexie.delete('ritmo');
 });
 
 /** Writes a database that looks the way the given schema version left it. */
-async function seedLegacy(version: 1 | 2 | 3) {
+async function seedLegacy(version: 1 | 2 | 3 | 4) {
   const legacy = new Dexie('ritmo');
   legacy.version(1).stores(V1_STORES);
   if (version >= 2) legacy.version(2).stores(V2_STORES);
   if (version >= 3) legacy.version(3).stores(V3_STORES);
+  if (version >= 4) legacy.version(4).stores(V4_STORES);
   await legacy.open();
+
+  if (version === 4) {
+    await legacy.table('notes').put({
+      id: 'n1',
+      text: 'Repaint the hallway',
+      status: 'open',
+      createdAt: '2026-09-18T00:00:00.000Z',
+      updatedAt: '2026-09-18T00:00:00.000Z'
+    });
+  }
 
   await legacy.table('routines').put({
     id: 'r1',
@@ -50,7 +62,7 @@ async function seedLegacy(version: 1 | 2 | 3) {
     endDate: '2026-09-20',
     year: 2026,
     weekNumber: 38,
-    ...(version === 3
+    ...(version >= 3
       ? { routinePlan: [{ appliesFrom: '2026-09-14', routines: snapshot }] }
       : { routinePlanSnapshot: snapshot }),
     createdAt: '2026-09-14T00:00:00.000Z'
@@ -69,7 +81,7 @@ async function seedLegacy(version: 1 | 2 | 3) {
   legacy.close();
 }
 
-describe.each([1, 2, 3] as const)('upgrading from schema v%i', (version) => {
+describe.each([1, 2, 3, 4] as const)('upgrading from schema v%i', (version) => {
   it('keeps the user data and moves the week onto plan revisions', async () => {
     await seedLegacy(version);
 
@@ -93,21 +105,32 @@ describe.each([1, 2, 3] as const)('upgrading from schema v%i', (version) => {
     db.close();
   });
 
-  it('opens an empty notes backlog without disturbing anything', async () => {
+  it('opens empty notes stores without disturbing anything', async () => {
     await seedLegacy(version);
 
     const db = new RitmoDatabase();
     await db.open();
 
-    expect(await db.notes.count()).toBe(0);
+    // v4 is the only older version that had notes at all.
+    expect(await db.notes.count()).toBe(version === 4 ? 1 : 0);
+    expect(await db.noteEntries.count()).toBe(0);
+
     await db.notes.put({
       id: 'n1',
-      text: 'Buy a standing desk',
-      status: 'open',
+      title: 'Home',
       createdAt: '2026-09-18T00:00:00.000Z',
       updatedAt: '2026-09-18T00:00:00.000Z'
     });
-    expect((await db.notes.get('n1'))?.text).toBe('Buy a standing desk');
+    await db.noteEntries.put({
+      id: 'e1',
+      noteId: 'n1',
+      text: 'Fix the tap',
+      createdAt: '2026-09-18T00:00:00.000Z',
+      updatedAt: '2026-09-18T00:00:00.000Z'
+    });
+
+    expect((await db.notes.get('n1'))?.title).toBe('Home');
+    expect((await db.noteEntries.where('noteId').equals('n1').toArray())).toHaveLength(1);
     expect(await db.routines.count()).toBe(1);
 
     db.close();
@@ -127,6 +150,23 @@ describe('upgrading from schema v1', () => {
 
     const week = (await db.weeks.get('2026-09-14'))!;
     expect(week.routinePlan[0].routines[0].timing).toBe('anytime');
+
+    db.close();
+  });
+});
+
+describe('upgrading from schema v4', () => {
+  it('keeps what a flat note said as the new note title', async () => {
+    await seedLegacy(4);
+
+    const db = new RitmoDatabase();
+    await db.open();
+
+    const note = (await db.notes.get('n1'))!;
+    expect(note.title).toBe('Repaint the hallway');
+    expect(note).not.toHaveProperty('text');
+    expect(note).not.toHaveProperty('status');
+    expect(await db.noteEntries.count()).toBe(0);
 
     db.close();
   });

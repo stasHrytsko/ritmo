@@ -45,7 +45,19 @@ export const repositories: Repositories = {
     list: () => db.notes.orderBy('createdAt').toArray(),
     create: async (note) => { await db.notes.add(note); },
     update: async (note) => { await db.notes.put(note); },
-    remove: async (id) => { await db.notes.delete(id); }
+    remove: async (id) => {
+      await db.transaction('rw', db.notes, db.noteEntries, async () => {
+        await db.notes.delete(id);
+        await db.noteEntries.where('noteId').equals(id).delete();
+      });
+    }
+  },
+  noteEntries: {
+    list: () => db.noteEntries.orderBy('createdAt').toArray(),
+    listByNote: (noteId) => db.noteEntries.where('noteId').equals(noteId).toArray(),
+    create: async (entry) => { await db.noteEntries.add(entry); },
+    update: async (entry) => { await db.noteEntries.put(entry); },
+    remove: async (id) => { await db.noteEntries.delete(id); }
   },
   weeks: {
     get: (id) => db.weeks.get(id),
@@ -91,6 +103,7 @@ export const repositories: Repositories = {
       weeks: await db.weeks.toArray(),
       completions: await db.completions.toArray(),
       notes: await db.notes.toArray(),
+      noteEntries: await db.noteEntries.toArray(),
       settings: await db.settings.toArray()
     }),
     importAll: async (payload: BackupPayload) => {
@@ -100,13 +113,17 @@ export const repositories: Repositories = {
 
       await db.transaction(
         'rw',
-        [db.routines, db.goals, db.goalTasks, db.notes, db.weeks, db.completions, db.settings],
+        [
+          db.routines, db.goals, db.goalTasks, db.notes, db.noteEntries,
+          db.weeks, db.completions, db.settings
+        ],
         async () => {
           await Promise.all([
             db.routines.clear(),
             db.goals.clear(),
             db.goalTasks.clear(),
             db.notes.clear(),
+            db.noteEntries.clear(),
             db.weeks.clear(),
             db.completions.clear(),
             db.settings.clear()
@@ -117,6 +134,7 @@ export const repositories: Repositories = {
           await db.weeks.bulkPut(restored.weeks);
           await db.completions.bulkPut(restored.completions);
           await db.notes.bulkPut(restored.notes);
+          await db.noteEntries.bulkPut(restored.noteEntries);
           await db.settings.bulkPut(restored.settings);
         }
       );

@@ -5,6 +5,7 @@ import type {
   GoalTask,
   ISODate,
   Note,
+  NoteEntry,
   Routine,
   RoutineCompletion,
   WeekRecord
@@ -40,6 +41,15 @@ export interface NoteRepository {
   list(): Promise<Note[]>;
   create(note: Note): Promise<void>;
   update(note: Note): Promise<void>;
+  /** Removes the note together with its entries. */
+  remove(id: string): Promise<void>;
+}
+
+export interface NoteEntryRepository {
+  list(): Promise<NoteEntry[]>;
+  listByNote(noteId: string): Promise<NoteEntry[]>;
+  create(entry: NoteEntry): Promise<void>;
+  update(entry: NoteEntry): Promise<void>;
   remove(id: string): Promise<void>;
 }
 
@@ -74,6 +84,7 @@ export interface Repositories {
   goals: GoalRepository;
   goalTasks: GoalTaskRepository;
   notes: NoteRepository;
+  noteEntries: NoteEntryRepository;
   weeks: WeekRepository;
   completions: CompletionRepository;
   settings: SettingsRepository;

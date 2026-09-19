@@ -5,6 +5,7 @@ import {
   type Goal,
   type GoalTask,
   type Note,
+  type NoteEntry,
   type Routine,
   type RoutineCompletion,
   type RoutinePlanRevision,
@@ -23,10 +24,23 @@ const STORES = {
 
 const STORES_V4 = { ...STORES, notes: 'id, status, createdAt, updatedAt' };
 
+const STORES_V5 = {
+  ...STORES,
+  notes: 'id, createdAt, updatedAt',
+  noteEntries: 'id, noteId, createdAt, updatedAt'
+};
+
 /** Shapes as they exist on disk mid-migration, before the current types apply. */
 interface StoredRoutine {
   timing?: string;
   time?: string;
+}
+
+interface StoredNote {
+  title?: string;
+  text?: string;
+  status?: string;
+  completedAt?: string;
 }
 
 interface StoredWeek {
@@ -48,6 +62,7 @@ export class RitmoDatabase extends Dexie {
   goals!: EntityTable<Goal, 'id'>;
   goalTasks!: EntityTable<GoalTask, 'id'>;
   notes!: EntityTable<Note, 'id'>;
+  noteEntries!: EntityTable<NoteEntry, 'id'>;
   weeks!: EntityTable<WeekRecord, 'id'>;
   completions!: EntityTable<RoutineCompletion, 'id'>;
   settings!: EntityTable<AppSettings, 'key'>;
@@ -87,8 +102,21 @@ export class RitmoDatabase extends Dexie {
       await bumpSchemaVersion(tx, 3);
     });
 
-    // v4 added the notes backlog. A new store only, so nothing to rewrite.
+    // v4 added a flat notes backlog. A new store only, so nothing to rewrite.
     this.version(4).stores(STORES_V4).upgrade(async (tx) => {
+      await bumpSchemaVersion(tx, 4);
+    });
+
+    // v5 turned a note into a named list that holds entries. Whatever a v4
+    // note said becomes the new note's title rather than being dropped.
+    this.version(5).stores(STORES_V5).upgrade(async (tx) => {
+      await tx.table<StoredNote>('notes').toCollection().modify((note) => {
+        note.title ??= note.text ?? 'Note';
+        delete note.text;
+        delete note.status;
+        delete note.completedAt;
+      });
+
       await bumpSchemaVersion(tx, SCHEMA_VERSION);
     });
   }

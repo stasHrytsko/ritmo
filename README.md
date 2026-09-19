@@ -19,7 +19,7 @@ It separates two kinds of progress:
 - Month calendar
 - Year overview
 - Goals with weekly tasks
-- Notes: a standing backlog of things to do some day
+- Notes: named lists of entries, each promotable to a goal
 - Routine scheduling by weekday
 - JSON backup/export and restore/import, validated before it replaces anything
 - Installable PWA
@@ -63,11 +63,14 @@ npm run check
 
 ## Notes
 
-The Notes block at the bottom of Today is a backlog: anything to remember to
-do some day, with no date on it. It is the same list whichever day is on
-screen, it sits outside the medal rule entirely, and it is where goals come
-from. It starts collapsed, because it is reference material rather than
-today's work.
+Notes is its own tab and its own entity, outside the day/week/year timeline:
+no schedule, no completion, no effect on medals.
+
+A note is a name. Open it and you append entries, as many as you like. Each
+entry can be edited, deleted, or added to goals — you give it a start and an
+end date and it becomes an active goal. Adding to goals copies the entry
+rather than moving it, so the note stays as you wrote it. Deleting a note
+takes its entries with it.
 
 ## Themes
 
@@ -127,11 +130,12 @@ The code is intentionally prepared for future storage migration/sync while keepi
 
 ## Mobile navigation
 
-V1 is intentionally mobile-first and has three permanent bottom sections:
+V1 is intentionally mobile-first and has four permanent bottom sections:
 
-- **Today** — current day with Goals, Routine and the Notes backlog
+- **Today** — current day with Goals and Routine
 - **Progress** — progress with Week / Month / Year switch
 - **Life** — Routine / Goals editor and list
+- **Notes** — named lists of entries, the backlog goals come from
 
 ## Install as PWA
 
