@@ -1702,3 +1702,75 @@ input {
 .theme-picker button {
   min-width: 0;
 }
+
+.note-add {
+  margin-bottom: 4px;
+}
+
+.note-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.note-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  border-top: 1px solid var(--line);
+}
+
+.note-row:first-child {
+  border-top: 0;
+}
+
+.note-check {
+  flex: 1;
+  min-width: 0;
+  min-height: 52px;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 8px 2px;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.note-text {
+  min-width: 0;
+  font-size: 13px;
+  font-weight: 650;
+  overflow-wrap: anywhere;
+}
+
+.note-row.done .note-text {
+  color: var(--muted);
+  text-decoration: line-through;
+}
+
+.note-row.done .check-circle {
+  border-color: var(--ink);
+  background: var(--ink);
+  color: var(--on-ink);
+}
+
+.note-delete {
+  flex: 0 0 34px;
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--ink-faint);
+  font-size: 19px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.note-delete:hover {
+  background: var(--inset);
+  color: var(--danger);
+}

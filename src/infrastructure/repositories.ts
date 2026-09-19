@@ -41,6 +41,12 @@ export const repositories: Repositories = {
     update: async (task) => { await db.goalTasks.put(task); },
     remove: async (id) => { await db.goalTasks.delete(id); }
   },
+  notes: {
+    list: () => db.notes.orderBy('createdAt').toArray(),
+    create: async (note) => { await db.notes.add(note); },
+    update: async (note) => { await db.notes.put(note); },
+    remove: async (id) => { await db.notes.delete(id); }
+  },
   weeks: {
     get: (id) => db.weeks.get(id),
     list: () => db.weeks.orderBy('startDate').toArray(),
@@ -84,6 +90,7 @@ export const repositories: Repositories = {
       goalTasks: await db.goalTasks.toArray(),
       weeks: await db.weeks.toArray(),
       completions: await db.completions.toArray(),
+      notes: await db.notes.toArray(),
       settings: await db.settings.toArray()
     }),
     importAll: async (payload: BackupPayload) => {
@@ -93,12 +100,13 @@ export const repositories: Repositories = {
 
       await db.transaction(
         'rw',
-        [db.routines, db.goals, db.goalTasks, db.weeks, db.completions, db.settings],
+        [db.routines, db.goals, db.goalTasks, db.notes, db.weeks, db.completions, db.settings],
         async () => {
           await Promise.all([
             db.routines.clear(),
             db.goals.clear(),
             db.goalTasks.clear(),
+            db.notes.clear(),
             db.weeks.clear(),
             db.completions.clear(),
             db.settings.clear()
@@ -108,6 +116,7 @@ export const repositories: Repositories = {
           await db.goalTasks.bulkPut(restored.goalTasks);
           await db.weeks.bulkPut(restored.weeks);
           await db.completions.bulkPut(restored.completions);
+          await db.notes.bulkPut(restored.notes);
           await db.settings.bulkPut(restored.settings);
         }
       );

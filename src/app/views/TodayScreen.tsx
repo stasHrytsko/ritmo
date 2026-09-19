@@ -1,21 +1,34 @@
 import { useMemo, useState } from 'react';
 import type { TodayView } from '../../application/ritmoService';
-import type { GoalTask } from '../../domain/types';
+import type { GoalTask, Note } from '../../domain/types';
 import { monthName, weekdayName } from '../../domain/time';
 import { AccordionHeader, Empty } from '../components/ui';
+import { NotesBlock } from '../components/NotesBlock';
 import { RoutineTimeline } from '../components/RoutineTimeline';
 import { WeekStrip } from '../components/WeekStrip';
 
 export function TodayScreen({
   data,
   onToggleRoutine,
-  onToggleTask
+  onToggleTask,
+  onAddNote,
+  onToggleNote,
+  onDeleteNote
 }: {
   data: TodayView;
   onToggleRoutine: (routineId: string) => Promise<void>;
   onToggleTask: (task: GoalTask) => Promise<void>;
+  onAddNote: (text: string) => Promise<void>;
+  onToggleNote: (note: Note) => Promise<void>;
+  onDeleteNote: (note: Note) => Promise<void>;
 }) {
-  const [sections, setSections] = useState({ goals: true, routine: true, anytime: true });
+  const [sections, setSections] = useState({
+    goals: true,
+    routine: true,
+    anytime: true,
+    // The backlog is reference material, not today's work: open it on purpose.
+    notes: false
+  });
   const [openGoals, setOpenGoals] = useState<Record<string, boolean>>({});
 
   const timed = useMemo(
@@ -165,6 +178,15 @@ export function TodayScreen({
           </div>
         )}
       </section>
+
+      <NotesBlock
+        notes={data.notes}
+        open={sections.notes}
+        onToggleOpen={() => setSections((current) => ({ ...current, notes: !current.notes }))}
+        onAdd={onAddNote}
+        onToggle={onToggleNote}
+        onDelete={onDeleteNote}
+      />
     </section>
   );
 }

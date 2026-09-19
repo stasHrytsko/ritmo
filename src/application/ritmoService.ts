@@ -2,6 +2,7 @@ import {
   SCHEMA_VERSION,
   type Goal,
   type GoalTask,
+  type Note,
   type Routine,
   type RoutineSnapshot,
   type WeekRecord
@@ -45,6 +46,7 @@ export interface TodayView {
   medal: boolean;
   week: DayStrip[];
   goals: Array<{ goal: Goal; tasks: GoalTask[] }>;
+  notes: Note[];
   daysLeft: number;
   weeksLeft: number;
 }
@@ -96,6 +98,13 @@ export interface LifeView {
   goals: Goal[];
   tasks: GoalTask[];
 }
+
+/** Still to do on top, newest first; anything ticked off sinks below. */
+export const sortNotes = (notes: Note[]): Note[] =>
+  [...notes].sort((a, b) => {
+    if (a.status !== b.status) return a.status === 'open' ? -1 : 1;
+    return b.createdAt.localeCompare(a.createdAt);
+  });
 
 export class RitmoService {
   private booting?: Promise<void>;
@@ -231,6 +240,7 @@ export class RitmoService {
 
     const goals = (await this.repos.goals.list()).filter((goal) => goal.status === 'active');
     const weekTasks = await this.repos.goalTasks.listByWeek(week.id);
+    const notes = await this.repos.notes.list();
 
     return {
       date,
@@ -245,6 +255,7 @@ export class RitmoService {
           )
         }))
         .filter((item) => item.tasks.length > 0),
+      notes: sortNotes(notes),
       daysLeft: daysLeftInYear(date),
       weeksLeft: weeksLeftInYear(date)
     };
@@ -397,6 +408,34 @@ export class RitmoService {
       completedAt: done ? now() : undefined,
       updatedAt: now()
     });
+  }
+
+  async addNote(text: string) {
+    const trimmed = text.trim();
+    if (!trimmed) return;
+
+    const stamp = now();
+    await this.repos.notes.create({
+      id: id(),
+      text: trimmed,
+      status: 'open',
+      createdAt: stamp,
+      updatedAt: stamp
+    });
+  }
+
+  async toggleNote(note: Note) {
+    const done = note.status !== 'done';
+    await this.repos.notes.update({
+      ...note,
+      status: done ? 'done' : 'open',
+      completedAt: done ? now() : undefined,
+      updatedAt: now()
+    });
+  }
+
+  async deleteNote(noteId: string) {
+    await this.repos.notes.remove(noteId);
   }
 
   async getWeek(at = new Date()): Promise<WeekView> {

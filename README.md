@@ -19,6 +19,7 @@ It separates two kinds of progress:
 - Month calendar
 - Year overview
 - Goals with weekly tasks
+- Notes: a standing backlog of things to do some day
 - Routine scheduling by weekday
 - JSON backup/export and restore/import, validated before it replaces anything
 - Installable PWA
@@ -59,6 +60,14 @@ Checks (lint, types, tests) — the same set CI runs:
 ```bash
 npm run check
 ```
+
+## Notes
+
+The Notes block at the bottom of Today is a backlog: anything to remember to
+do some day, with no date on it. It is the same list whichever day is on
+screen, it sits outside the medal rule entirely, and it is where goals come
+from. It starts collapsed, because it is reference material rather than
+today's work.
 
 ## Themes
 
@@ -120,7 +129,7 @@ The code is intentionally prepared for future storage migration/sync while keepi
 
 V1 is intentionally mobile-first and has three permanent bottom sections:
 
-- **Today** — current day with Goals and Routine
+- **Today** — current day with Goals, Routine and the Notes backlog
 - **Progress** — progress with Week / Month / Year switch
 - **Life** — Routine / Goals editor and list
 

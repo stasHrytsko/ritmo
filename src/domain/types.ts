@@ -2,8 +2,8 @@ export type ISODate = string;
 export type GoalStatus = 'active' | 'paused' | 'done';
 export type RoutineTiming = 'exact' | 'anytime';
 
-export const SCHEMA_VERSION = 3;
-export const SUPPORTED_SCHEMA_VERSIONS = [1, 2, 3];
+export const SCHEMA_VERSION = 4;
+export const SUPPORTED_SCHEMA_VERSIONS = [1, 2, 3, 4];
 
 export interface Routine {
   id: string;
@@ -57,6 +57,20 @@ export interface GoalTask {
   updatedAt: string;
 }
 
+/**
+ * A standing backlog: things to do some day, with no date attached. Notes are
+ * where goals come from, so they deliberately sit outside the day/week/year
+ * timeline the rest of the model follows.
+ */
+export interface Note {
+  id: string;
+  text: string;
+  status: 'open' | 'done';
+  createdAt: string;
+  updatedAt: string;
+  completedAt?: string;
+}
+
 export interface RoutineCompletion {
   id: string;
   date: ISODate;
@@ -92,5 +106,6 @@ export interface BackupPayload {
   goalTasks: GoalTask[];
   weeks: WeekRecord[];
   completions: RoutineCompletion[];
+  notes: Note[];
   settings: AppSettings[];
 }

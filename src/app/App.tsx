@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { GoalTask } from '../domain/types';
+import type { GoalTask, Note } from '../domain/types';
 import { logicalDayKey, toISODate } from '../domain/time';
 import { describeBackup, parseBackup } from '../domain/backup';
 import { repositories } from '../infrastructure/repositories';
@@ -212,6 +212,18 @@ export function App() {
             data={screen.data}
             onToggleRoutine={toggleRoutine}
             onToggleTask={toggleTask}
+            onAddNote={async (text) => {
+              await service.addNote(text);
+              await refresh('day');
+            }}
+            onToggleNote={async (note) => {
+              await service.toggleNote(note);
+              await refresh('day');
+            }}
+            onDeleteNote={async (note: Note) => {
+              await service.deleteNote(note.id);
+              await refresh('day');
+            }}
           />
         )}
 

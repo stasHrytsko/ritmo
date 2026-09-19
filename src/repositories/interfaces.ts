@@ -4,6 +4,7 @@ import type {
   Goal,
   GoalTask,
   ISODate,
+  Note,
   Routine,
   RoutineCompletion,
   WeekRecord
@@ -32,6 +33,13 @@ export interface GoalTaskRepository {
   listOpenBeforeWeek(weekId: ISODate): Promise<GoalTask[]>;
   create(task: GoalTask): Promise<void>;
   update(task: GoalTask): Promise<void>;
+  remove(id: string): Promise<void>;
+}
+
+export interface NoteRepository {
+  list(): Promise<Note[]>;
+  create(note: Note): Promise<void>;
+  update(note: Note): Promise<void>;
   remove(id: string): Promise<void>;
 }
 
@@ -65,6 +73,7 @@ export interface Repositories {
   routines: RoutineRepository;
   goals: GoalRepository;
   goalTasks: GoalTaskRepository;
+  notes: NoteRepository;
   weeks: WeekRepository;
   completions: CompletionRepository;
   settings: SettingsRepository;

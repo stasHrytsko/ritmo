@@ -14,16 +14,18 @@ const V1_STORES = {
 };
 
 const V2_STORES = { ...V1_STORES, routines: 'id, active, timing, time, createdAt, updatedAt' };
+const V3_STORES = V2_STORES;
 
 afterEach(async () => {
   await Dexie.delete('ritmo');
 });
 
 /** Writes a database that looks the way the given schema version left it. */
-async function seedLegacy(version: 1 | 2) {
+async function seedLegacy(version: 1 | 2 | 3) {
   const legacy = new Dexie('ritmo');
   legacy.version(1).stores(V1_STORES);
-  if (version === 2) legacy.version(2).stores(V2_STORES);
+  if (version >= 2) legacy.version(2).stores(V2_STORES);
+  if (version >= 3) legacy.version(3).stores(V3_STORES);
   await legacy.open();
 
   await legacy.table('routines').put({
@@ -31,23 +33,26 @@ async function seedLegacy(version: 1 | 2) {
     name: 'Walk',
     active: true,
     weekdays: [1, 2, 3],
-    ...(version === 2 ? { timing: 'exact', time: '07:30' } : {}),
+    ...(version >= 2 ? { timing: 'exact', time: '07:30' } : {}),
     createdAt: '2026-01-01T00:00:00.000Z',
     updatedAt: '2026-01-01T00:00:00.000Z'
   });
+  const snapshot = [{
+    routineId: 'r1',
+    name: 'Walk',
+    active: true,
+    weekdays: [1, 2, 3],
+    ...(version >= 2 ? { timing: 'exact', time: '07:30' } : {})
+  }];
   await legacy.table('weeks').put({
     id: '2026-09-14',
     startDate: '2026-09-14',
     endDate: '2026-09-20',
     year: 2026,
     weekNumber: 38,
-    routinePlanSnapshot: [{
-      routineId: 'r1',
-      name: 'Walk',
-      active: true,
-      weekdays: [1, 2, 3],
-      ...(version === 2 ? { timing: 'exact', time: '07:30' } : {})
-    }],
+    ...(version === 3
+      ? { routinePlan: [{ appliesFrom: '2026-09-14', routines: snapshot }] }
+      : { routinePlanSnapshot: snapshot }),
     createdAt: '2026-09-14T00:00:00.000Z'
   });
   await legacy.table('completions').put({
@@ -64,7 +69,7 @@ async function seedLegacy(version: 1 | 2) {
   legacy.close();
 }
 
-describe.each([1, 2] as const)('upgrading from schema v%i', (version) => {
+describe.each([1, 2, 3] as const)('upgrading from schema v%i', (version) => {
   it('keeps the user data and moves the week onto plan revisions', async () => {
     await seedLegacy(version);
 
@@ -84,6 +89,26 @@ describe.each([1, 2] as const)('upgrading from schema v%i', (version) => {
     expect(settings.schemaVersion).toBe(SCHEMA_VERSION);
     // The one-time seed must not run again for an existing install.
     expect(settings.defaultsSeedVersion).toBe(1);
+
+    db.close();
+  });
+
+  it('opens an empty notes backlog without disturbing anything', async () => {
+    await seedLegacy(version);
+
+    const db = new RitmoDatabase();
+    await db.open();
+
+    expect(await db.notes.count()).toBe(0);
+    await db.notes.put({
+      id: 'n1',
+      text: 'Buy a standing desk',
+      status: 'open',
+      createdAt: '2026-09-18T00:00:00.000Z',
+      updatedAt: '2026-09-18T00:00:00.000Z'
+    });
+    expect((await db.notes.get('n1'))?.text).toBe('Buy a standing desk');
+    expect(await db.routines.count()).toBe(1);
 
     db.close();
   });

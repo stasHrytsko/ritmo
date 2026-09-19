@@ -53,6 +53,34 @@ describe('parseBackup', () => {
       .toEqual(['2026-09-14', '2026-09-17']);
   });
 
+  it('accepts a file from before notes existed', () => {
+    const payload = valid();
+    expect('notes' in payload).toBe(false);
+    expect(parseBackup(payload).notes).toEqual([]);
+  });
+
+  it('restores notes and normalises their status', () => {
+    const payload = {
+      ...valid(),
+      schemaVersion: 4,
+      notes: [
+        { id: 'n1', text: 'Buy a desk', status: 'done' },
+        { id: 'n2', text: 'Learn to swim', status: 'open' },
+        { id: 'n3', text: 'No status at all' }
+      ]
+    };
+    const notes = parseBackup(payload).notes;
+    expect(notes.map((note) => note.status)).toEqual(['done', 'open', 'open']);
+  });
+
+  it.each([
+    ['a note without text', { ...valid(), notes: [{ id: 'n1' }] }],
+    ['a note without an id', { ...valid(), notes: [{ text: 'Buy a desk' }] }],
+    ['a notes list that is not a list', { ...valid(), notes: 'nope' }]
+  ])('rejects %s', (_label, payload) => {
+    expect(() => parseBackup(payload)).toThrow(BackupValidationError);
+  });
+
   it('drops a stray time from an anytime routine', () => {
     const payload = { ...valid(), routines: [{ id: 'r1', name: 'Walk', timing: 'anytime', time: '07:30' }] };
     expect(parseBackup(payload).routines[0].time).toBeUndefined();
@@ -84,6 +112,6 @@ describe('parseBackup', () => {
 describe('describeBackup', () => {
   it('summarises what a restore would replace', () => {
     expect(describeBackup(parseBackup(valid())))
-      .toBe('1 routines, 1 goals, 1 completion records');
+      .toBe('1 routines, 1 goals, 0 notes, 1 completion records');
   });
 });

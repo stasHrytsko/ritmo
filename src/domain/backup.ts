@@ -27,6 +27,19 @@ const requireArray = (payload: Record<string, unknown>, key: string): Record<str
   return value;
 };
 
+/** Lists added after a backup format shipped are absent from older files. */
+const optionalArray = (payload: Record<string, unknown>, key: string): Record<string, unknown>[] => {
+  if (payload[key] === undefined) return [];
+  const value = payload[key];
+  if (!Array.isArray(value)) {
+    throw new BackupValidationError(`Backup has a malformed "${key}" list.`);
+  }
+  if (!value.every(isRecord)) {
+    throw new BackupValidationError(`Backup has a malformed entry in "${key}".`);
+  }
+  return value;
+};
+
 const requireFields = (rows: Record<string, unknown>[], key: string, fields: string[]) => {
   for (const row of rows) {
     for (const field of fields) {
@@ -94,6 +107,8 @@ export const parseBackup = (raw: unknown): BackupPayload => {
     'date',
     'routineId'
   ]);
+  // Notes arrived in v4; a v1-v3 file simply has none.
+  const notes = requireFields(optionalArray(raw, 'notes'), 'notes', ['id', 'text']);
   const settings = requireFields(requireArray(raw, 'settings'), 'settings', ['key']);
 
   return {
@@ -104,6 +119,10 @@ export const parseBackup = (raw: unknown): BackupPayload => {
     goalTasks: goalTasks as unknown as BackupPayload['goalTasks'],
     weeks: weeks.map(normalizeWeek),
     completions: completions as unknown as BackupPayload['completions'],
+    notes: notes.map((note) => ({
+      ...note,
+      status: note.status === 'done' ? 'done' : 'open'
+    })) as unknown as BackupPayload['notes'],
     settings: settings.map((item) => ({
       ...item,
       schemaVersion: SCHEMA_VERSION
@@ -114,4 +133,4 @@ export const parseBackup = (raw: unknown): BackupPayload => {
 /** Rough size of a backup, for the confirmation prompt. */
 export const describeBackup = (payload: BackupPayload) =>
   `${payload.routines.length} routines, ${payload.goals.length} goals, `
-  + `${payload.completions.length} completion records`;
+  + `${payload.notes.length} notes, ${payload.completions.length} completion records`;

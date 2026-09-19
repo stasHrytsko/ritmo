@@ -237,6 +237,62 @@ describe('createRoutine', () => {
   });
 });
 
+describe('notes', () => {
+  it('adds a note as open', async () => {
+    await service.addNote('Buy a standing desk');
+    expect(store.notes).toHaveLength(1);
+    expect(store.notes[0].text).toBe('Buy a standing desk');
+    expect(store.notes[0].status).toBe('open');
+  });
+
+  it('trims the text and ignores an empty note', async () => {
+    await service.addNote('   Learn to swim   ');
+    await service.addNote('   ');
+    await service.addNote('');
+    expect(store.notes).toHaveLength(1);
+    expect(store.notes[0].text).toBe('Learn to swim');
+  });
+
+  it('ticks a note off and back on', async () => {
+    await service.addNote('Fix the bike');
+    await service.toggleNote(store.notes[0]);
+    expect(store.notes[0].status).toBe('done');
+    expect(store.notes[0].completedAt).toBeDefined();
+
+    await service.toggleNote(store.notes[0]);
+    expect(store.notes[0].status).toBe('open');
+    expect(store.notes[0].completedAt).toBeUndefined();
+  });
+
+  it('deletes a note', async () => {
+    await service.addNote('Fix the bike');
+    await service.deleteNote(store.notes[0].id);
+    expect(store.notes).toHaveLength(0);
+  });
+
+  it('shows still-to-do notes first, newest at the top', async () => {
+    vi.setSystemTime(new Date('2026-09-18T10:00:00+02:00'));
+    await service.addNote('Oldest');
+    vi.setSystemTime(new Date('2026-09-18T11:00:00+02:00'));
+    await service.addNote('Middle');
+    vi.setSystemTime(new Date('2026-09-18T12:00:00+02:00'));
+    await service.addNote('Newest');
+
+    await service.toggleNote(store.notes.find((note) => note.text === 'Newest')!);
+
+    const { notes } = await service.getToday();
+    expect(notes.map((note) => note.text)).toEqual(['Middle', 'Oldest', 'Newest']);
+  });
+
+  it('is the same list whatever day is on screen', async () => {
+    await service.addNote('Buy a standing desk');
+    expect((await service.getToday()).notes).toHaveLength(1);
+
+    vi.setSystemTime(new Date('2026-11-03T10:00:00+01:00'));
+    expect((await service.getToday()).notes).toHaveLength(1);
+  });
+});
+
 describe('year view', () => {
   it('reports the day of the year and the year length', async () => {
     const year = await service.getYear();

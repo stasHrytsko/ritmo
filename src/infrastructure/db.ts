@@ -4,6 +4,7 @@ import {
   type AppSettings,
   type Goal,
   type GoalTask,
+  type Note,
   type Routine,
   type RoutineCompletion,
   type RoutinePlanRevision,
@@ -19,6 +20,8 @@ const STORES = {
   completions: 'id, date, routineId, [date+routineId]',
   settings: 'key'
 };
+
+const STORES_V4 = { ...STORES, notes: 'id, status, createdAt, updatedAt' };
 
 /** Shapes as they exist on disk mid-migration, before the current types apply. */
 interface StoredRoutine {
@@ -44,6 +47,7 @@ export class RitmoDatabase extends Dexie {
   routines!: EntityTable<Routine, 'id'>;
   goals!: EntityTable<Goal, 'id'>;
   goalTasks!: EntityTable<GoalTask, 'id'>;
+  notes!: EntityTable<Note, 'id'>;
   weeks!: EntityTable<WeekRecord, 'id'>;
   completions!: EntityTable<RoutineCompletion, 'id'>;
   settings!: EntityTable<AppSettings, 'key'>;
@@ -80,6 +84,11 @@ export class RitmoDatabase extends Dexie {
         delete week.routinePlanSnapshot;
       });
 
+      await bumpSchemaVersion(tx, 3);
+    });
+
+    // v4 added the notes backlog. A new store only, so nothing to rewrite.
+    this.version(4).stores(STORES_V4).upgrade(async (tx) => {
       await bumpSchemaVersion(tx, SCHEMA_VERSION);
     });
   }
