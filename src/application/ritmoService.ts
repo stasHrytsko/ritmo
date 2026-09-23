@@ -5,6 +5,7 @@ import {
   type GoalTask,
   type Note,
   type NoteEntry,
+  type NoteEntryOutcome,
   type Routine,
   type RoutineCompletion,
   type RoutineSnapshot,
@@ -155,6 +156,8 @@ export interface NoteWithEntries {
 
 export interface NotesView {
   notes: NoteWithEntries[];
+  /** Active goals, for filing an entry as a task of one of them. */
+  goals: Pick<Goal, 'id' | 'name'>[];
 }
 
 export class RitmoService {
@@ -538,9 +541,10 @@ export class RitmoService {
   }
 
   async getNotes(): Promise<NotesView> {
-    const [notes, entries] = await Promise.all([
+    const [notes, entries, goals] = await Promise.all([
       this.repos.notes.list(),
-      this.repos.noteEntries.list()
+      this.repos.noteEntries.list(),
+      this.repos.goals.list()
     ]);
 
     // Newest note first; entries stay in the order they were written.
@@ -552,7 +556,10 @@ export class RitmoService {
           entries: entries
             .filter((entry) => entry.noteId === note.id)
             .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
-        }))
+        })),
+      goals: goals
+        .filter((goal) => goal.status === 'active')
+        .map(({ id: goalId, name }) => ({ id: goalId, name }))
     };
   }
 
@@ -599,11 +606,33 @@ export class RitmoService {
   }
 
   /**
-   * Turns an entry into a goal. The entry stays on its note: adding to goals
-   * copies it rather than moving it.
+   * Turns an entry into a goal. The entry stays on its note, marked, so the
+   * backlog shows what has already been acted on.
    */
-  async addEntryToGoals(entry: NoteEntry, startDate: string, endDate: string) {
+  async entryToGoal(entry: NoteEntry, startDate: string, endDate: string) {
     await this.createGoal(entry.text, startDate, endDate);
+    await this.markEntry(entry, 'goal');
+  }
+
+  /** Files an entry as a task of an existing goal, planned for this week. */
+  async entryToGoalTask(entry: NoteEntry, goalId: string) {
+    await this.addGoalTask(goalId, entry.text);
+    await this.markEntry(entry, 'task');
+  }
+
+  /** Turns an entry into a routine, from the next plan revision on. */
+  async entryToRoutine(
+    entry: NoteEntry,
+    weekdays: number[],
+    timing: Routine['timing'],
+    time?: string
+  ) {
+    await this.createRoutine(entry.text, weekdays, timing, time);
+    await this.markEntry(entry, 'routine');
+  }
+
+  private async markEntry(entry: NoteEntry, madeInto: NoteEntryOutcome) {
+    await this.repos.noteEntries.update({ ...entry, madeInto, updatedAt: now() });
   }
 
   async getWeek(at = new Date()): Promise<WeekView> {

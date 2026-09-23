@@ -46,11 +46,13 @@ export function NavButton({
   label,
   icon,
   active,
+  badge = false,
   onClick
 }: {
   label: string;
   icon: NavIconType;
   active: boolean;
+  badge?: boolean;
   onClick: () => void;
 }) {
   return (
@@ -60,7 +62,10 @@ export function NavButton({
       aria-current={active ? 'page' : undefined}
       onClick={onClick}
     >
-      <NavIcon type={icon} active={active} />
+      <span className="nav-icon">
+        <NavIcon type={icon} active={active} />
+        {badge && <i className="nav-badge" aria-label="Есть новое" />}
+      </span>
       <span>{label}</span>
     </button>
   );

@@ -1,3 +1,4 @@
+import { useEffect, useState, type CSSProperties } from 'react';
 import { Chevron } from './icons';
 
 export function Empty({ text }: { text: string }) {
@@ -20,7 +21,7 @@ export function AccordionHeader({
   onToggle
 }: {
   title: string;
-  meta: string;
+  meta?: string;
   open: boolean;
   onToggle: () => void;
 }) {
@@ -28,10 +29,75 @@ export function AccordionHeader({
     <button type="button" className="accordion-header" aria-expanded={open} onClick={onToggle}>
       <h2>{title}</h2>
       <span className="accordion-header-right">
-        <b>{meta}</b>
+        {meta && <b>{meta}</b>}
         <Chevron />
       </span>
     </button>
+  );
+}
+
+export interface SegmentOption<T extends string> {
+  value: T;
+  label: string;
+}
+
+/**
+ * A row of mutually exclusive options with one thumb that slides to the
+ * chosen one. `from` lets a control that is remounted on every change (the
+ * period switch lives inside each period's screen) start where the last one
+ * stood, so the slide still reads.
+ */
+export function Segmented<T extends string>({
+  options,
+  value,
+  onChange,
+  from,
+  kind = 'pressed',
+  className = '',
+  labelledBy
+}: {
+  options: SegmentOption<T>[];
+  value: T;
+  onChange: (value: T) => void;
+  from?: T;
+  kind?: 'pressed' | 'current';
+  className?: string;
+  labelledBy?: string;
+}) {
+  const target = Math.max(0, options.findIndex((option) => option.value === value));
+  const start = from === undefined ? target : Math.max(0, options.findIndex((option) => option.value === from));
+  const [index, setIndex] = useState(start);
+
+  useEffect(() => {
+    // One frame at the old place, then slide.
+    const frame = requestAnimationFrame(() => setIndex(target));
+    return () => cancelAnimationFrame(frame);
+  }, [target]);
+
+  return (
+    <div
+      className={`segmented ${className}`.trim()}
+      role="group"
+      aria-labelledby={labelledBy}
+      style={{ '--n': options.length, '--idx': index } as CSSProperties}
+    >
+      <i className="segmented-thumb" aria-hidden="true" />
+      {options.map((option) => {
+        const active = option.value === value;
+        return (
+          <button
+            type="button"
+            key={option.value}
+            className={active ? 'active' : ''}
+            aria-pressed={kind === 'pressed' ? active : undefined}
+            aria-current={kind === 'current' && active ? 'page' : undefined}
+            onClick={() => onChange(option.value)}
+          >
+            {option.label}
+          </button>
+        );
+      })}
+    </div>
   );
 }
 
@@ -64,7 +130,15 @@ export function ProgressSummary({ title, done, total }: { title: string; done: n
 
 export type PeriodView = 'week' | 'month' | 'year';
 
-const PERIOD_LABELS: Record<PeriodView, string> = { week: 'Неделя', month: 'Месяц', year: 'Год' };
+const PERIODS: SegmentOption<PeriodView>[] = [
+  { value: 'week', label: 'Неделя' },
+  { value: 'month', label: 'Месяц' },
+  { value: 'year', label: 'Год' }
+];
+
+// Each period is its own screen, so the switch is remounted on every change;
+// this remembers where its thumb last stood.
+let lastPeriod: PeriodView | undefined;
 
 export function PeriodSwitch({
   current,
@@ -73,19 +147,21 @@ export function PeriodSwitch({
   current: PeriodView;
   onChange: (view: PeriodView) => void;
 }) {
+  const [from] = useState(() => {
+    const previous = lastPeriod;
+    lastPeriod = current;
+    return previous;
+  });
+  useEffect(() => { lastPeriod = current; }, [current]);
+
   return (
-    <div className="period-switch">
-      {(['week', 'month', 'year'] as PeriodView[]).map((period) => (
-        <button
-          type="button"
-          key={period}
-          className={current === period ? 'active' : ''}
-          aria-current={current === period ? 'page' : undefined}
-          onClick={() => onChange(period)}
-        >
-          {PERIOD_LABELS[period]}
-        </button>
-      ))}
-    </div>
+    <Segmented
+      options={PERIODS}
+      value={current}
+      from={from}
+      kind="current"
+      className="period-switch"
+      onChange={onChange}
+    />
   );
 }

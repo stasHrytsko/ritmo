@@ -69,10 +69,14 @@ export interface Note {
   updatedAt: string;
 }
 
+/** What an entry was turned into, so the note shows it has been acted on. */
+export type NoteEntryOutcome = 'goal' | 'task' | 'routine';
+
 export interface NoteEntry {
   id: string;
   noteId: string;
   text: string;
+  madeInto?: NoteEntryOutcome;
   createdAt: string;
   updatedAt: string;
 }

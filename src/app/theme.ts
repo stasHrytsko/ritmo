@@ -45,7 +45,7 @@ export function resolveTheme(preference: ThemePreference): 'light' | 'dark' {
   return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
 }
 
-const THEME_COLORS = { light: '#f3efe6', dark: '#14130f' };
+const THEME_COLORS = { light: '#f3f2ef', dark: '#121211' };
 
 /**
  * The browser picks a theme-color meta by its media attribute, which ignores an

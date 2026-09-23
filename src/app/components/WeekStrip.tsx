@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from 'react';
 import type { DayStrip } from '../../application/ritmoService';
 import { WEEKDAY_LETTERS, weekdayName } from '../../domain/time';
 import { Check } from './icons';
@@ -10,6 +11,17 @@ const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
  * a full ring with a tick is the medal. Tapping a day opens it in Today.
  */
 export function WeekStrip({ days, onSelect }: { days: DayStrip[]; onSelect?: (date: Date) => void }) {
+  // Today's circle answers a tick with a small pulse; loading does not count.
+  const todayProgress = days.find((day) => day.isToday)?.progress;
+  const seen = useRef(todayProgress);
+  const [pulse, setPulse] = useState(0);
+  useEffect(() => {
+    if (seen.current !== undefined && todayProgress !== undefined && todayProgress !== seen.current) {
+      setPulse((count) => count + 1);
+    }
+    seen.current = todayProgress;
+  }, [todayProgress]);
+
   return (
     <div className="week-strip">
       {days.map((day, index) => {
@@ -48,6 +60,7 @@ export function WeekStrip({ days, onSelect }: { days: DayStrip[]; onSelect?: (da
                 )}
               </svg>
               <em>{day.date.getDate()}</em>
+              {day.isToday && pulse > 0 && <i className="ring-pulse" key={pulse} aria-hidden="true" />}
             </b>
             <i>{day.medal && <Check />}</i>
           </button>

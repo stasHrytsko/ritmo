@@ -142,7 +142,7 @@ export const parseBackup = (raw: unknown): BackupPayload => {
     weeks: weeks.map(normalizeWeek),
     completions: completions as unknown as BackupPayload['completions'],
     notes: titledNotes as unknown as BackupPayload['notes'],
-    noteEntries: noteEntries as unknown as BackupPayload['noteEntries'],
+    noteEntries: noteEntries.map(normalizeNoteEntry) as unknown as BackupPayload['noteEntries'],
     settings: settings.map((item) => ({
       ...item,
       schemaVersion: SCHEMA_VERSION
@@ -154,3 +154,13 @@ export const parseBackup = (raw: unknown): BackupPayload => {
 export const describeBackup = (payload: BackupPayload) =>
   `рутин: ${payload.routines.length}, целей: ${payload.goals.length}, `
   + `заметок: ${payload.notes.length}, отметок: ${payload.completions.length}`;
+
+const ENTRY_OUTCOMES: readonly unknown[] = ['goal', 'task', 'routine'];
+
+/** An entry's outcome mark is optional; one this version does not know is dropped. */
+function normalizeNoteEntry(entry: Record<string, unknown>): Record<string, unknown> {
+  if (entry.madeInto === undefined || ENTRY_OUTCOMES.includes(entry.madeInto)) return entry;
+  const rest = { ...entry };
+  delete rest.madeInto;
+  return rest;
+}

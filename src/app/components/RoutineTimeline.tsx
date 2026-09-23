@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useState } from 'react';
+import { Fragment, useEffect, useState, type ReactNode } from 'react';
 import type { RoutineDayState } from '../../domain/medal';
 import { routineStatus, type RoutineStatus } from '../../domain/status';
 import type { ISODate } from '../../domain/types';
@@ -22,19 +22,33 @@ function useNow(intervalMs = 30_000) {
 
 type RowStatus = RoutineStatus | 'next';
 
-/** "43 мин", "1 ч 5 мин", "2 ч". */
-function formatSpan(minutes: number) {
-  if (minutes < 60) return `${minutes} мин`;
-  const hours = Math.floor(minutes / 60);
-  const rest = minutes % 60;
-  return rest ? `${hours} ч ${rest} мин` : `${hours} ч`;
+const STATUS_WORDS: Record<RowStatus, string> = {
+  done: 'выполнено',
+  missed: 'пропущено',
+  due: 'пора',
+  next: 'следующее',
+  ahead: 'впереди'
+};
+
+/** Minutes apart below which two routines read as back to back. */
+const TIGHT_MINUTES = 20;
+/** Minutes apart from which the pause is drawn as a break in the rail. */
+const LONG_MINUTES = 90;
+
+/**
+ * The space between two rows follows the clock, so a glance shows what comes
+ * straight after and what is hours away — without writing it down.
+ */
+function Gap({ minutes }: { minutes: number }) {
+  if (minutes >= LONG_MINUTES) return <li className="timeline-gap is-long" aria-hidden="true" />;
+  const extra = minutes <= TIGHT_MINUTES ? 0 : ((minutes - TIGHT_MINUTES) / (LONG_MINUTES - TIGHT_MINUTES)) * 14;
+  return <li className="timeline-gap" style={{ height: 5 + Math.round(extra) }} aria-hidden="true" />;
 }
 
 /**
  * The day's timed routines in order. Done ones fold into a single line so the
- * list starts at what is still ahead. What is left reads in three ways:
- * missed (quiet, still tickable), due right now (the one accent), and next
- * (lifted). Everything further ahead stays plain.
+ * list starts at what is still ahead. State is shown, not written: a dashed
+ * row was missed, the accent row is due, the lifted one is next.
  */
 export function RoutineTimeline({
   items,
@@ -85,65 +99,72 @@ export function RoutineTimeline({
       })()
     : -1;
 
-  const labelFor = (status: RowStatus, item: RoutineDayState) => {
-    if (disabled) return undefined;
-    // The dashed row already says it can still be ticked.
-    if (status === 'missed') return live ? 'пропущено' : 'не отмечено';
-    if (status === 'due') {
-      const late = nowMinutes - minutesOf(item);
-      return late > 0 ? `сейчас · ${formatSpan(late)} назад` : 'сейчас';
+  // Rows and the now marker in order, each with the clock time it stands at,
+  // so the gaps between them can follow the clock.
+  const rows: Array<{ key: string; minutes: number; node: ReactNode }> = [];
+  open.forEach((state, index) => {
+    if (index === markerIndex) {
+      rows.push({ key: 'now', minutes: nowMinutes, node: <NowMarker label={nowLabel} /> });
     }
-    if (status === 'next') return `следующее · через ${formatSpan(minutesOf(item) - nowMinutes)}`;
-    return undefined;
-  };
+    const id = state.routine.routineId;
+    rows.push({
+      key: id,
+      minutes: minutesOf(state),
+      node: (
+        <TimelineRow
+          state={state}
+          status={statuses[index]}
+          disabled={disabled || ticking.has(id)}
+          ticking={ticking.has(id)}
+          leaving={leaving.has(id)}
+          onPress={() => tick(id)}
+        />
+      )
+    });
+  });
+  if (markerIndex === open.length) {
+    rows.push({ key: 'now', minutes: nowMinutes, node: <NowMarker label={nowLabel} /> });
+  }
 
   return (
     <div className="routine-timeline">
-      {done.length > 0 && (
-        <>
-          <button
-            type="button"
-            className="done-pill"
-            aria-expanded={showDone}
-            onClick={() => setShowDone((current) => !current)}
-          >
-            <span className="done-pill-mark"><Check /></span>
-            <span>Выполнено · <b key={done.length} className="done-pill-count">{done.length}</b></span>
-            <span className="done-pill-action">{showDone ? 'скрыть' : 'показать'}<Chevron /></span>
-          </button>
-          <Collapse open={showDone}>
-            <ol className="timeline-list done-list">
-              {done.map((state) => (
-                <TimelineRow
-                  key={state.routine.routineId}
-                  state={state}
-                  status="done"
-                  disabled={disabled}
-                  onPress={() => void onToggle(state.routine.routineId)}
-                />
-              ))}
-            </ol>
-          </Collapse>
-        </>
-      )}
+      <button
+        type="button"
+        className="done-pill"
+        aria-expanded={showDone}
+        aria-label={`Выполнено ${done.length} из ${items.length}`}
+        disabled={done.length === 0}
+        onClick={() => setShowDone((current) => !current)}
+      >
+        <span className="done-pill-mark"><Check /></span>
+        <span>
+          Выполнено
+          <b key={done.length} className="done-pill-count">{done.length}/{items.length}</b>
+        </span>
+        {done.length > 0 && <Chevron />}
+      </button>
+      <Collapse open={showDone && done.length > 0}>
+        <ol className="timeline-list done-list">
+          {done.map((state) => (
+            <TimelineRow
+              key={state.routine.routineId}
+              state={state}
+              status="done"
+              disabled={disabled}
+              onPress={() => void onToggle(state.routine.routineId)}
+            />
+          ))}
+        </ol>
+      </Collapse>
 
-      {open.length > 0 && (
+      {rows.length > 0 && (
         <ol className="timeline-list">
-          {open.map((state, index) => (
-            <Fragment key={state.routine.routineId}>
-              {index === markerIndex && <NowMarker label={nowLabel} />}
-              <TimelineRow
-                state={state}
-                status={statuses[index]}
-                label={labelFor(statuses[index], state)}
-                disabled={disabled || ticking.has(state.routine.routineId)}
-                ticking={ticking.has(state.routine.routineId)}
-                leaving={leaving.has(state.routine.routineId)}
-                onPress={() => tick(state.routine.routineId)}
-              />
+          {rows.map((row, index) => (
+            <Fragment key={row.key}>
+              {index > 0 && <Gap minutes={row.minutes - rows[index - 1].minutes} />}
+              {row.node}
             </Fragment>
           ))}
-          {markerIndex === open.length && <NowMarker label={nowLabel} />}
         </ol>
       )}
     </div>
@@ -153,7 +174,6 @@ export function RoutineTimeline({
 function TimelineRow({
   state,
   status,
-  label,
   disabled,
   ticking = false,
   leaving = false,
@@ -161,7 +181,6 @@ function TimelineRow({
 }: {
   state: RoutineDayState;
   status: RowStatus;
-  label?: string;
   disabled: boolean;
   ticking?: boolean;
   leaving?: boolean;
@@ -180,12 +199,12 @@ function TimelineRow({
           type="button"
           className="timeline-task"
           aria-pressed={status === 'done' || ticking}
+          aria-label={`${state.routine.name}, ${state.routine.time}, ${STATUS_WORDS[status]}`}
           disabled={disabled}
           onClick={onPress}
         >
           <span className="timeline-copy">
             <strong>{state.routine.name}</strong>
-            {label && <small>{label}</small>}
           </span>
           <span className="task-check"><Check /></span>
         </button>

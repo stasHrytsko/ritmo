@@ -337,14 +337,15 @@ describe('notes', () => {
   });
 });
 
-describe('adding an entry to goals', () => {
-  it('creates an active goal from the entry text and dates', async () => {
+describe('turning an entry into something', () => {
+  const entryFor = async (text: string) => {
     await service.createNote('Home');
-    const note = store.notes[0];
-    await service.addNoteEntry(note.id, 'Repaint the hallway');
-    const entry = store.noteEntries[0];
+    await service.addNoteEntry(store.notes[0].id, text);
+    return store.noteEntries[0];
+  };
 
-    await service.addEntryToGoals(entry, '2026-10-01', '2026-12-31');
+  it('creates an active goal from the entry text and dates', async () => {
+    await service.entryToGoal(await entryFor('Repaint the hallway'), '2026-10-01', '2026-12-31');
 
     expect(store.goals).toHaveLength(1);
     expect(store.goals[0].name).toBe('Repaint the hallway');
@@ -353,22 +354,46 @@ describe('adding an entry to goals', () => {
     expect(store.goals[0].status).toBe('active');
   });
 
-  it('leaves the entry on its note', async () => {
-    await service.createNote('Home');
-    await service.addNoteEntry(store.notes[0].id, 'Repaint the hallway');
-    await service.addEntryToGoals(store.noteEntries[0], '2026-10-01', '2026-12-31');
+  it('leaves the entry on its note, marked with what it became', async () => {
+    await service.entryToGoal(await entryFor('Repaint the hallway'), '2026-10-01', '2026-12-31');
 
     expect(store.noteEntries).toHaveLength(1);
     expect(store.noteEntries[0].text).toBe('Repaint the hallway');
+    expect(store.noteEntries[0].madeInto).toBe('goal');
   });
 
-  it('shows up in Life like any other goal', async () => {
-    await service.createNote('Home');
-    await service.addNoteEntry(store.notes[0].id, 'Repaint the hallway');
-    await service.addEntryToGoals(store.noteEntries[0], '2026-10-01', '2026-12-31');
+  it('shows a new goal in Life like any other', async () => {
+    await service.entryToGoal(await entryFor('Repaint the hallway'), '2026-10-01', '2026-12-31');
 
     const life = await service.getLife();
     expect(life.goals.map((goal) => goal.name)).toContain('Repaint the hallway');
+  });
+
+  it('files an entry as a task of an existing goal, this week', async () => {
+    await service.createGoal('Home', '2026-09-01', '2026-12-31');
+    const goal = store.goals[0];
+    await service.entryToGoalTask(await entryFor('Buy bulbs'), goal.id);
+
+    expect(store.goalTasks).toHaveLength(1);
+    expect(store.goalTasks[0]).toMatchObject({ goalId: goal.id, title: 'Buy bulbs', status: 'open', plannedWeekId: THIS_WEEK });
+    expect(store.noteEntries[0].madeInto).toBe('task');
+  });
+
+  it('turns an entry into a routine with its days and time', async () => {
+    await service.entryToRoutine(await entryFor('Swim'), [6], 'exact', '08:00');
+
+    const routine = store.routines.find((item) => item.name === 'Swim')!;
+    expect(routine).toMatchObject({ weekdays: [6], timing: 'exact', time: '08:00', active: true });
+    expect(store.noteEntries[0].madeInto).toBe('routine');
+  });
+
+  it('offers only active goals to file entries under', async () => {
+    await service.createGoal('Live', '2026-09-01', '2026-12-31');
+    await service.createGoal('Paused', '2026-09-01', '2026-12-31');
+    await service.updateGoal({ ...store.goals.find((goal) => goal.name === 'Paused')!, status: 'paused' });
+
+    const { goals } = await service.getNotes();
+    expect(goals.map((goal) => goal.name)).toEqual(['Live']);
   });
 });
 

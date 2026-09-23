@@ -36,3 +36,37 @@ export function ChevronRight() {
     </svg>
   );
 }
+
+/** What a note entry became: a goal, a task in a goal, or a routine. */
+export function GoalMark() {
+  return (
+    <svg className="icon-line" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M5 21V4M5 4h12l-2.5 4.5L17 13H5" />
+    </svg>
+  );
+}
+
+export function TaskMark() {
+  return (
+    <svg className="icon-line" viewBox="0 0 24 24" aria-hidden="true">
+      <rect x="4" y="4" width="16" height="16" rx="4" />
+      <path d="M8.5 12.2l2.4 2.4 4.6-5" />
+    </svg>
+  );
+}
+
+export function RoutineMark() {
+  return (
+    <svg className="icon-line" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M17 3l3 3-3 3M4 12v-2a4 4 0 0 1 4-4h12M7 21l-3-3 3-3M20 12v2a4 4 0 0 1-4 4H4" />
+    </svg>
+  );
+}
+
+export function TrashMark() {
+  return (
+    <svg className="icon-line" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M4 7h16M9 7V4.5h6V7M6.5 7l1 13h9l1-13" />
+    </svg>
+  );
+}

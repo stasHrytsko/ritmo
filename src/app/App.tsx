@@ -66,6 +66,8 @@ export function App() {
   const [dataMenuOpen, setDataMenuOpen] = useState(false);
   const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(null);
+  // Something new landed in Life from a note; the tab says so until visited.
+  const [lifeBadge, setLifeBadge] = useState(false);
   const pendingDeleteRef = useRef<PendingDelete | null>(null);
   const undoTimer = useRef<number | undefined>(undefined);
   const viewRef = useRef(view);
@@ -376,8 +378,18 @@ export function App() {
             onDeleteEntry={async (entryId) => {
               await scheduleDelete('Запись удалена', [entryId], () => service.deleteNoteEntry(entryId));
             }}
-            onAddEntryToGoals={async (entry, startDate, endDate) => {
-              await service.addEntryToGoals(entry, startDate, endDate);
+            onConvertEntry={async (entry, text, target) => {
+              // An edit made in the same sheet travels with the conversion.
+              const current = text !== entry.text ? { ...entry, text } : entry;
+              if (current !== entry) await service.updateNoteEntry(entry, text);
+              if (target.kind === 'goal') {
+                await service.entryToGoal(current, target.startDate, target.endDate);
+              } else if (target.kind === 'task') {
+                await service.entryToGoalTask(current, target.goalId);
+              } else {
+                await service.entryToRoutine(current, target.weekdays, target.timing, target.time);
+              }
+              setLifeBadge(true);
               await refresh('notes');
             }}
           />
@@ -474,7 +486,13 @@ export function App() {
           active={isProgress(view)}
           onClick={() => navigate(isProgress(view) ? view : 'week')}
         />
-        <NavButton label="Жизнь" icon="life" active={view === 'life'} onClick={() => navigate('life')} />
+        <NavButton
+          label="Жизнь"
+          icon="life"
+          active={view === 'life'}
+          badge={lifeBadge}
+          onClick={() => { setLifeBadge(false); navigate('life'); }}
+        />
         <NavButton label="Заметки" icon="notes" active={view === 'notes'} onClick={() => navigate('notes')} />
       </footer>
     </div>
@@ -539,6 +557,7 @@ function withoutIds(screen: Screen, ids: ReadonlySet<string>): Screen {
     return {
       view: 'notes',
       data: {
+        ...screen.data,
         notes: screen.data.notes
           .filter((item) => !ids.has(item.note.id))
           .map((item) => ({ ...item, entries: item.entries.filter((entry) => !ids.has(entry.id)) }))

@@ -1,17 +1,29 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import type { NotesView } from '../../application/ritmoService';
-import type { Note, NoteEntry } from '../../domain/types';
+import type { Note, NoteEntry, NoteEntryOutcome, Routine } from '../../domain/types';
+import { guessRoutine } from '../../domain/entryGuess';
 import { addDays, plural, toISODate } from '../../domain/time';
 import { Collapse } from '../components/Collapse';
 import { EditorSheet } from '../components/EditorSheet';
-import { Chevron, ChevronRight } from '../components/icons';
+import { Chevron, GoalMark, RoutineMark, TaskMark, TrashMark } from '../components/icons';
 import { Empty } from '../components/ui';
 
 type Sheet =
   | { kind: 'note'; note: Note }
   | { kind: 'entry'; entry: NoteEntry }
-  | { kind: 'goal'; entry: NoteEntry }
   | null;
+
+/** Where an entry goes: a new goal, a task of a goal, or a routine. */
+export type EntryTarget =
+  | { kind: 'goal'; startDate: string; endDate: string }
+  | { kind: 'task'; goalId: string }
+  | { kind: 'routine'; weekdays: number[]; timing: Routine['timing']; time?: string };
+
+const OUTCOME_MARKS: Record<NoteEntryOutcome, { icon: ReactNode; label: string }> = {
+  goal: { icon: <GoalMark />, label: 'стала целью' },
+  task: { icon: <TaskMark />, label: 'стала задачей' },
+  routine: { icon: <RoutineMark />, label: 'стала рутиной' }
+};
 
 export function NotesScreen({
   data,
@@ -21,7 +33,7 @@ export function NotesScreen({
   onAddEntry,
   onUpdateEntry,
   onDeleteEntry,
-  onAddEntryToGoals
+  onConvertEntry
 }: {
   data: NotesView;
   onCreateNote: (title: string) => Promise<void>;
@@ -30,13 +42,15 @@ export function NotesScreen({
   onAddEntry: (noteId: string, text: string) => Promise<void>;
   onUpdateEntry: (entry: NoteEntry, text: string) => Promise<void>;
   onDeleteEntry: (entryId: string) => Promise<void>;
-  onAddEntryToGoals: (entry: NoteEntry, startDate: string, endDate: string) => Promise<void>;
+  onConvertEntry: (entry: NoteEntry, text: string, target: EntryTarget) => Promise<void>;
 }) {
   const [openNotes, setOpenNotes] = useState<Record<string, boolean>>({});
   const [creating, setCreating] = useState(false);
   const [titleDraft, setTitleDraft] = useState('');
   const [entryDrafts, setEntryDrafts] = useState<Record<string, string>>({});
   const [sheet, setSheet] = useState<Sheet>(null);
+  // The entry just turned into something, so its mark can pop in once.
+  const [justMade, setJustMade] = useState<string | null>(null);
 
   const createNote = async () => {
     if (!titleDraft.trim()) return;
@@ -94,17 +108,23 @@ export function NotesScreen({
 
               <Collapse open={open}>
                 <div className="note-entries">
-                  {entries.map((entry) => (
-                    <button
-                      type="button"
-                      className="note-entry"
-                      key={entry.id}
-                      onClick={() => setSheet({ kind: 'entry', entry })}
-                    >
-                      <span>{entry.text}</span>
-                      <ChevronRight />
-                    </button>
-                  ))}
+                  {entries.map((entry) => {
+                    const mark = entry.madeInto ? OUTCOME_MARKS[entry.madeInto] : undefined;
+                    return (
+                      <button
+                        type="button"
+                        className={`note-entry${mark ? ' is-made' : ''}`}
+                        key={entry.id}
+                        aria-label={mark ? `${entry.text}, ${mark.label}` : undefined}
+                        onClick={() => setSheet({ kind: 'entry', entry })}
+                      >
+                        <span>{entry.text}</span>
+                        {mark && (
+                          <i className={`entry-mark${justMade === entry.id ? ' is-fresh' : ''}`}>{mark.icon}</i>
+                        )}
+                      </button>
+                    );
+                  })}
                   {entries.length === 0 && <Empty text="Пока ничего не записано." />}
 
                   <div className="task-add">
@@ -170,18 +190,14 @@ export function NotesScreen({
       {sheet?.kind === 'entry' && (
         <EntrySheet
           entry={sheet.entry}
+          goals={data.goals}
           onClose={() => setSheet(null)}
           onUpdate={onUpdateEntry}
           onDelete={onDeleteEntry}
-          onAddToGoals={() => setSheet({ kind: 'goal', entry: sheet.entry })}
-        />
-      )}
-
-      {sheet?.kind === 'goal' && (
-        <GoalSheet
-          entry={sheet.entry}
-          onClose={() => setSheet(null)}
-          onConfirm={onAddEntryToGoals}
+          onConvert={async (text, target) => {
+            await onConvertEntry(sheet.entry, text, target);
+            setJustMade(sheet.entry.id);
+          }}
         />
       )}
     </section>
@@ -227,104 +243,242 @@ function NoteSheet({
   );
 }
 
+const SPANS = [
+  { label: 'Неделя', days: 7 },
+  { label: 'Месяц', days: 30 },
+  { label: '3 месяца', days: 91 }
+];
+
+const PARTS = [
+  { label: 'Утро', time: '08:00' },
+  { label: 'День', time: '13:00' },
+  { label: 'Вечер', time: '19:00' },
+  { label: 'Любое', time: '' }
+];
+
+const WEEKDAYS = [
+  { value: 1, label: 'П', name: 'Понедельник' },
+  { value: 2, label: 'В', name: 'Вторник' },
+  { value: 3, label: 'С', name: 'Среда' },
+  { value: 4, label: 'Ч', name: 'Четверг' },
+  { value: 5, label: 'П', name: 'Пятница' },
+  { value: 6, label: 'С', name: 'Суббота' },
+  { value: 7, label: 'В', name: 'Воскресенье' }
+];
+
+const shortDate = (date: Date) =>
+  new Intl.DateTimeFormat('ru', { day: 'numeric', month: 'short' }).format(date).replace('.', '');
+
+const CREATE_LABELS: Record<EntryTarget['kind'], string> = {
+  goal: 'Создать цель',
+  task: 'Добавить в цель',
+  routine: 'Создать рутину'
+};
+
 function EntrySheet({
   entry,
+  goals,
   onClose,
   onUpdate,
   onDelete,
-  onAddToGoals
+  onConvert
 }: {
   entry: NoteEntry;
+  goals: NotesView['goals'];
   onClose: () => void;
   onUpdate: (entry: NoteEntry, text: string) => Promise<void>;
   onDelete: (entryId: string) => Promise<void>;
-  onAddToGoals: () => void;
+  onConvert: (text: string, target: EntryTarget) => Promise<void>;
 }) {
   const [text, setText] = useState(entry.text);
+  const [kind, setKind] = useState<EntryTarget['kind'] | null>(null);
+  const [span, setSpan] = useState(1);
+  const [goalId, setGoalId] = useState(goals[0]?.id);
+  const [guess] = useState(() => guessRoutine(entry.text));
+  const [part, setPart] = useState(guess.part);
+  const [time, setTime] = useState(PARTS[guess.part].time || '08:00');
+  const [weekdays, setWeekdays] = useState(guess.weekdays);
+  const [saving, setSaving] = useState(false);
+
+  const start = new Date();
+  const end = addDays(start, SPANS[span].days);
+  const spanShare = SPANS[span].days / SPANS[SPANS.length - 1].days;
+  const trimmed = text.trim();
+
+  // Leaving the sheet keeps an edited text; nothing else needs a save button.
+  const close = () => {
+    if (trimmed && trimmed !== entry.text) void onUpdate(entry, trimmed);
+    onClose();
+  };
+
+  const target = (): EntryTarget | null => {
+    if (kind === 'goal') return { kind, startDate: toISODate(start), endDate: toISODate(end) };
+    if (kind === 'task') return goalId ? { kind, goalId } : null;
+    if (kind === 'routine') {
+      const anytime = PARTS[part].time === '';
+      return { kind, weekdays, timing: anytime ? 'anytime' : 'exact', time: anytime ? undefined : time };
+    }
+    return null;
+  };
+
+  const create = async () => {
+    const chosen = target();
+    if (!chosen || !trimmed || saving) return;
+    setSaving(true);
+    try {
+      await onConvert(trimmed, chosen);
+      onClose();
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const tiles: Array<{ value: EntryTarget['kind']; label: string; icon: ReactNode; disabled?: boolean }> = [
+    { value: 'goal', label: 'Цель', icon: <GoalMark /> },
+    { value: 'task', label: 'Задача', icon: <TaskMark />, disabled: goals.length === 0 },
+    { value: 'routine', label: 'Рутина', icon: <RoutineMark /> }
+  ];
 
   return (
-    <EditorSheet title="Запись" onClose={onClose}>
-      <label className="field">
-        <span>Текст</span>
-        <input autoFocus value={text} onChange={(event) => setText(event.target.value)} />
-      </label>
-
-      <button
-        type="button"
-        className="primary"
-        onClick={() => void onUpdate(entry, text).then(onClose)}
-      >
-        Сохранить
-      </button>
-
-      <div className="editor-divider" />
-
-      <button type="button" className="utility-row" onClick={onAddToGoals}>
-        <span><strong>Сделать целью</strong><small>Указать даты начала и конца</small></span>
-        <ChevronRight />
-      </button>
-
-      <button
-        type="button"
-        className="danger-link"
-        onClick={() => void onDelete(entry.id).then(onClose)}
-      >
-        Удалить запись
-      </button>
-    </EditorSheet>
-  );
-}
-
-function GoalSheet({
-  entry,
-  onClose,
-  onConfirm
-}: {
-  entry: NoteEntry;
-  onClose: () => void;
-  onConfirm: (entry: NoteEntry, startDate: string, endDate: string) => Promise<void>;
-}) {
-  const [startDate, setStartDate] = useState(toISODate(new Date()));
-  const [endDate, setEndDate] = useState(toISODate(addDays(new Date(), 30)));
-
-  const invalid = endDate < startDate;
-
-  return (
-    <EditorSheet title="Сделать целью" onClose={onClose}>
-      <div className="data-sheet-copy">
-        <strong>{entry.text}</strong>
-        <span>Появится активная цель. Запись останется в заметке.</span>
+    <EditorSheet title="Запись" onClose={close}>
+      <div className="entry-edit">
+        <input
+          value={text}
+          aria-label="Текст записи"
+          onChange={(event) => setText(event.target.value)}
+        />
+        <button
+          type="button"
+          className="icon-button danger"
+          aria-label="Удалить запись"
+          onClick={() => void onDelete(entry.id).then(onClose)}
+        >
+          <TrashMark />
+        </button>
       </div>
 
-      <div className="date-fields">
-        <label className="field">
-          <span>Начало</span>
-          <input
-            type="date"
-            value={startDate}
-            onChange={(event) => setStartDate(event.target.value)}
-          />
-        </label>
-        <label className="field">
-          <span>Конец</span>
-          <input
-            type="date"
-            value={endDate}
-            onChange={(event) => setEndDate(event.target.value)}
-          />
-        </label>
+      <div className="make-tiles" role="group" aria-label="Сделать из записи">
+        {tiles.map((tile) => (
+          <button
+            type="button"
+            key={tile.value}
+            className="make-tile"
+            aria-pressed={kind === tile.value}
+            disabled={tile.disabled}
+            onClick={() => setKind(tile.value)}
+          >
+            {tile.icon}
+            {tile.label}
+          </button>
+        ))}
       </div>
 
-      {invalid && <div className="field-error">Дата конца раньше даты начала.</div>}
+      <Collapse open={kind === 'goal'}>
+        <div className="make-options">
+          <div className="chips" role="group" aria-label="Срок">
+            {SPANS.map((option, index) => (
+              <button
+                type="button"
+                key={option.label}
+                className="chip"
+                aria-pressed={span === index}
+                onClick={() => setSpan(index)}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+          <div className="span-line" aria-label={`С ${shortDate(start)} по ${shortDate(end)}`}>
+            <span className="span-track" />
+            <span className="span-fill" style={{ width: `${spanShare * 100}%` }} />
+            <span className="span-date">{shortDate(start)}</span>
+            <span className="span-date is-end" style={{ left: `${spanShare * 100}%` }}>{shortDate(end)}</span>
+          </div>
+        </div>
+      </Collapse>
 
-      <button
-        type="button"
-        className="primary"
-        disabled={invalid}
-        onClick={() => void onConfirm(entry, startDate, endDate).then(onClose)}
-      >
-        Создать цель
-      </button>
+      <Collapse open={kind === 'task'}>
+        <div className="make-options">
+          <div className="chips" role="group" aria-label="В какую цель">
+            {goals.map((goal) => (
+              <button
+                type="button"
+                key={goal.id}
+                className="chip"
+                aria-pressed={goalId === goal.id}
+                onClick={() => setGoalId(goal.id)}
+              >
+                {goal.name}
+              </button>
+            ))}
+          </div>
+        </div>
+      </Collapse>
+
+      <Collapse open={kind === 'routine'}>
+        <div className="make-options">
+          <div className="chips" role="group" aria-label="Когда">
+            {PARTS.map((option, index) => (
+              <button
+                type="button"
+                key={option.label}
+                className="chip"
+                aria-pressed={part === index}
+                onClick={() => {
+                  setPart(index);
+                  if (option.time) setTime(option.time);
+                }}
+              >
+                {option.label}
+                {option.time && <small>{index === part ? time : option.time}</small>}
+              </button>
+            ))}
+          </div>
+          {PARTS[part].time !== '' && (
+            <input
+              type="time"
+              className="make-time"
+              aria-label="Во сколько"
+              value={time}
+              onChange={(event) => setTime(event.target.value)}
+            />
+          )}
+          <div className="weekday-picker" role="group" aria-label="Дни">
+            {WEEKDAYS.map((day) => {
+              const selected = weekdays.includes(day.value);
+              return (
+                <button
+                  type="button"
+                  key={day.value}
+                  className={selected ? 'active' : ''}
+                  aria-pressed={selected}
+                  aria-label={day.name}
+                  onClick={() =>
+                    setWeekdays((current) =>
+                      selected
+                        ? current.length > 1 ? current.filter((value) => value !== day.value) : current
+                        : [...current, day.value].sort((a, b) => a - b)
+                    )
+                  }
+                >
+                  {day.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </Collapse>
+
+      {kind && (
+        <button
+          type="button"
+          className="primary make-create"
+          disabled={!trimmed || saving || !target()}
+          onClick={() => void create()}
+        >
+          {CREATE_LABELS[kind]}
+        </button>
+      )}
     </EditorSheet>
   );
 }

@@ -89,6 +89,22 @@ describe('parseBackup', () => {
     expect(restored.noteEntries.map((entry) => entry.text)).toEqual(['Fix the tap', 'Buy a desk']);
   });
 
+  it('keeps what an entry became and drops a mark it does not know', () => {
+    const payload = {
+      ...valid(),
+      schemaVersion: 5,
+      notes: [{ id: 'n1', title: 'Home' }],
+      noteEntries: [
+        { id: 'e1', noteId: 'n1', text: 'Swim', madeInto: 'routine' },
+        { id: 'e2', noteId: 'n1', text: 'Buy a desk', madeInto: 'wish' }
+      ]
+    };
+    const [swim, desk] = parseBackup(payload).noteEntries;
+
+    expect(swim.madeInto).toBe('routine');
+    expect(desk).not.toHaveProperty('madeInto');
+  });
+
   it('accepts a file from before note entries existed', () => {
     const payload = { ...valid(), schemaVersion: 4, notes: [{ id: 'n1', text: 'Home' }] };
     expect(parseBackup(payload).noteEntries).toEqual([]);

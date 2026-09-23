@@ -145,8 +145,8 @@ export function TodayScreen({
         </div>
         <div className="hero-left">
           <b>{data.daysLeft}</b>
-          <span>{plural(data.daysLeft, ['день', 'дня', 'дней'])} до конца года</span>
-          <span>{data.weeksLeft} {plural(data.weeksLeft, ['неделя', 'недели', 'недель'])}</span>
+          <span>{plural(data.daysLeft, ['день', 'дня', 'дней'])} до</span>
+          <span>конца года</span>
         </div>
       </div>
       <div
@@ -186,10 +186,7 @@ export function TodayScreen({
         {data.medal && (
           <div className="medal-card">
             <div className="medal-mark"><Check /></div>
-            <div>
-              <strong>День закрыт</strong>
-              <span>Все запланированные рутины выполнены.</span>
-            </div>
+            <strong>День закрыт</strong>
           </div>
         )}
 
@@ -207,14 +204,13 @@ export function TodayScreen({
                 {data.goals.map((group) => {
                   const doneCount = group.tasks.filter((task) => task.status === 'done').length;
 
-                  // Nothing planned for the day: the goal stays in sight, with why.
+                  // Nothing planned for the day: the goal stays in sight, quietly.
                   if (group.tasks.length === 0) {
                     return (
                       <article className="goal-today nested-accordion is-idle" key={group.goal.id}>
                         <div className="goal-accordion-header">
                           <span className="goal-accordion-copy">
                             <strong>{group.goal.name}</strong>
-                            <small>{group.weekTotal > 0 ? 'на этот день задач нет' : 'на эту неделю задач нет'}</small>
                           </span>
                         </div>
                       </article>
@@ -232,7 +228,7 @@ export function TodayScreen({
                       >
                         <span className="goal-accordion-copy">
                           <strong>{group.goal.name}</strong>
-                          <small>{doneCount}/{group.tasks.length} {plural(group.tasks.length, ['задача', 'задачи', 'задач'])}</small>
+                          <small>{doneCount}/{group.tasks.length}</small>
                         </span>
                         <Chevron />
                       </button>
@@ -264,7 +260,6 @@ export function TodayScreen({
         <section className="content-block accordion-block">
           <AccordionHeader
             title="Рутина"
-            meta={`${timed.filter((item) => item.done).length}/${timed.length}`}
             open={sections.routine}
             onToggle={() => setSections((current) => ({ ...current, routine: !current.routine }))}
           />

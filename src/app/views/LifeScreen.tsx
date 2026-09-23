@@ -4,10 +4,15 @@ import type { Goal, GoalTask, Routine } from '../../domain/types';
 import { addDays, routineMinutes, toISODate } from '../../domain/time';
 import { EditorSheet } from '../components/EditorSheet';
 import { Check, ChevronRight } from '../components/icons';
-import { Empty } from '../components/ui';
+import { Empty, Segmented, type SegmentOption } from '../components/ui';
 import { THEME_PREFERENCES, useThemePreference, type ThemePreference } from '../theme';
 
 type LifeTab = 'routines' | 'goals';
+
+const LIFE_TABS: SegmentOption<LifeTab>[] = [
+  { value: 'routines', label: 'Рутина' },
+  { value: 'goals', label: 'Цели' }
+];
 
 interface RoutineDraft {
   id?: string;
@@ -40,6 +45,11 @@ const WEEKDAYS = [
 ];
 
 const ALL_WEEKDAYS = WEEKDAYS.map((day) => day.value);
+
+const TIMINGS: SegmentOption<Routine['timing']>[] = [
+  { value: 'exact', label: 'Точное время' },
+  { value: 'anytime', label: 'В любое время' }
+];
 
 const emptyRoutineDraft = (): RoutineDraft => ({
   name: '',
@@ -147,111 +157,102 @@ export function LifeScreen({
     <section className="screen life-screen">
       <h1>Жизнь</h1>
 
-      <div className="segmented">
-        <button
-          type="button"
-          className={tab === 'routines' ? 'active' : ''}
-          aria-current={tab === 'routines' ? 'page' : undefined}
-          onClick={() => { setTab('routines'); setEditorOpen(false); }}
-        >
-          Рутина
-        </button>
-        <button
-          type="button"
-          className={tab === 'goals' ? 'active' : ''}
-          aria-current={tab === 'goals' ? 'page' : undefined}
-          onClick={() => { setTab('goals'); setEditorOpen(false); }}
-        >
-          Цели
-        </button>
-      </div>
+      <Segmented
+        options={LIFE_TABS}
+        value={tab}
+        kind="current"
+        onChange={(next) => { setTab(next); setEditorOpen(false); }}
+      />
 
-      <button type="button" className="add-new" onClick={openNew}>
-        <span>＋</span>
-        {tab === 'routines' ? 'Новая рутина' : 'Новая цель'}
-      </button>
+      {/* Keyed by tab, so switching slides the new list in from its side. */}
+      <div className={`tab-pane from-${tab === 'goals' ? 'right' : 'left'}`} key={tab}>
+        <button type="button" className="add-new" onClick={openNew}>
+          <span>＋</span>
+          {tab === 'routines' ? 'Новая рутина' : 'Новая цель'}
+        </button>
 
-      {tab === 'routines' && (
-        <div className="life-groups">
-          {groupByTimeOfDay(data.routines, data.dayBoundaryHour).map(([label, routines]) => (
-            <section className="life-group" key={label} aria-label={label}>
-              <h2 className="life-group-label">{label}</h2>
+        {tab === 'routines' && (
+          <div className="life-groups">
+            {groupByTimeOfDay(data.routines, data.dayBoundaryHour).map(([label, routines]) => (
+              <section className="life-group" key={label} aria-label={label}>
+                <h2 className="life-group-label">{label}</h2>
+                <ul className="inset-list">
+                  {routines.map((routine) => (
+                    <li className={`inset-row${routine.active ? '' : ' is-off'}`} key={routine.id}>
+                      <button
+                        type="button"
+                        className="inset-row-main"
+                        onClick={() => {
+                          setRoutineDraft({
+                            id: routine.id,
+                            name: routine.name,
+                            weekdays: routine.weekdays,
+                            timing: routine.timing ?? 'anytime',
+                            time: routine.time ?? '07:30'
+                          });
+                          setEditorOpen(true);
+                        }}
+                      >
+                        <strong>{routine.name}</strong>
+                        <small>
+                          {formatSchedule(routine.weekdays)}
+                          {routine.timing === 'exact' && routine.time ? ` · ${routine.time}` : ''}
+                        </small>
+                      </button>
+                      <button
+                        type="button"
+                        className="switch"
+                        role="switch"
+                        aria-checked={routine.active}
+                        aria-label={`${routine.name}: ${routine.active ? 'включена' : 'выключена'}`}
+                        onClick={() => void onToggleActive(routine)}
+                      />
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            ))}
+            {data.routines.length === 0 && <Empty text="Рутин пока нет." />}
+          </div>
+        )}
+
+        {tab === 'goals' && (
+          <div className="life-groups">
+            {data.goals.length > 0 && (
               <ul className="inset-list">
-                {routines.map((routine) => (
-                  <li className={`inset-row${routine.active ? '' : ' is-off'}`} key={routine.id}>
-                    <button
-                      type="button"
-                      className="inset-row-main"
-                      onClick={() => {
-                        setRoutineDraft({
-                          id: routine.id,
-                          name: routine.name,
-                          weekdays: routine.weekdays,
-                          timing: routine.timing ?? 'anytime',
-                          time: routine.time ?? '07:30'
-                        });
-                        setEditorOpen(true);
-                      }}
-                    >
-                      <strong>{routine.name}</strong>
-                      <small>
-                        {formatSchedule(routine.weekdays)}
-                        {routine.timing === 'exact' && routine.time ? ` · ${routine.time}` : ''}
-                      </small>
-                    </button>
-                    <button
-                      type="button"
-                      className="switch"
-                      role="switch"
-                      aria-checked={routine.active}
-                      aria-label={`${routine.name}: ${routine.active ? 'включена' : 'выключена'}`}
-                      onClick={() => void onToggleActive(routine)}
-                    />
-                  </li>
-                ))}
+                {data.goals.map((goal) => {
+                  const tasks = data.tasks.filter((task) => task.goalId === goal.id);
+                  const done = tasks.filter((task) => task.status === 'done').length;
+                  return (
+                    <li className="inset-row" key={goal.id}>
+                      <button
+                        type="button"
+                        className="inset-row-main"
+                        onClick={() => {
+                          setGoalDraft({
+                            id: goal.id,
+                            name: goal.name,
+                            startDate: goal.startDate,
+                            endDate: goal.endDate
+                          });
+                          setTaskDraft('');
+                          setEditorOpen(true);
+                        }}
+                      >
+                        <strong>{goal.name}</strong>
+                        <small>{formatGoalDates(goal.startDate, goal.endDate)}</small>
+                      </button>
+                      <span className="inset-row-meta">{done}/{tasks.length}</span>
+                      <ChevronRight />
+                    </li>
+                  );
+                })}
               </ul>
-            </section>
-          ))}
-          {data.routines.length === 0 && <Empty text="Рутин пока нет." />}
-        </div>
-      )}
-
-      {tab === 'goals' && (
-        <div className="life-groups">
-          {data.goals.length > 0 && (
-            <ul className="inset-list">
-              {data.goals.map((goal) => {
-                const tasks = data.tasks.filter((task) => task.goalId === goal.id);
-                const done = tasks.filter((task) => task.status === 'done').length;
-                return (
-                  <li className="inset-row" key={goal.id}>
-                    <button
-                      type="button"
-                      className="inset-row-main"
-                      onClick={() => {
-                        setGoalDraft({
-                          id: goal.id,
-                          name: goal.name,
-                          startDate: goal.startDate,
-                          endDate: goal.endDate
-                        });
-                        setTaskDraft('');
-                        setEditorOpen(true);
-                      }}
-                    >
-                      <strong>{goal.name}</strong>
-                      <small>{formatGoalDates(goal.startDate, goal.endDate)}</small>
-                    </button>
-                    <span className="inset-row-meta">{done}/{tasks.length}</span>
-                    <ChevronRight />
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-          {data.goals.length === 0 && <Empty text="Целей пока нет." />}
-        </div>
-      )}
+            )}
+            {data.goals.length === 0 && <Empty text="Целей пока нет." />}
+          </div>
+        )}
+      </div>
 
       {editorOpen && tab === 'routines' && (
         <EditorSheet title={routineDraft.id ? 'Рутина' : 'Новая рутина'} onClose={closeRoutineEditor}>
@@ -295,24 +296,12 @@ export function LifeScreen({
 
           <div className="field">
             <span id="routine-timing-label">Время</span>
-            <div className="timing-picker" role="group" aria-labelledby="routine-timing-label">
-              <button
-                type="button"
-                className={routineDraft.timing === 'exact' ? 'active' : ''}
-                aria-pressed={routineDraft.timing === 'exact'}
-                onClick={() => setRoutineDraft({ ...routineDraft, timing: 'exact' })}
-              >
-                Точное время
-              </button>
-              <button
-                type="button"
-                className={routineDraft.timing === 'anytime' ? 'active' : ''}
-                aria-pressed={routineDraft.timing === 'anytime'}
-                onClick={() => setRoutineDraft({ ...routineDraft, timing: 'anytime' })}
-              >
-                В любое время
-              </button>
-            </div>
+            <Segmented
+              options={TIMINGS}
+              value={routineDraft.timing}
+              labelledBy="routine-timing-label"
+              onChange={(timing) => setRoutineDraft({ ...routineDraft, timing })}
+            />
           </div>
 
           {routineDraft.timing === 'exact' && (
@@ -486,19 +475,12 @@ function ThemePicker() {
   return (
     <div className="field theme-field">
       <span id="theme-label">Тема</span>
-      <div className="timing-picker theme-picker" role="group" aria-labelledby="theme-label">
-        {THEME_PREFERENCES.map((option) => (
-          <button
-            type="button"
-            key={option}
-            className={preference === option ? 'active' : ''}
-            aria-pressed={preference === option}
-            onClick={() => choose(option)}
-          >
-            {THEME_LABELS[option]}
-          </button>
-        ))}
-      </div>
+      <Segmented
+        options={THEME_PREFERENCES.map((option) => ({ value: option, label: THEME_LABELS[option] }))}
+        value={preference}
+        labelledBy="theme-label"
+        onChange={choose}
+      />
     </div>
   );
 }
