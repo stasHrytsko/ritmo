@@ -205,9 +205,23 @@ export function TodayScreen({
             <Collapse open={sections.goals}>
               <div className="stack compact accordion-content">
                 {data.goals.map((group) => {
-                  const goalOpen = openGoals[group.goal.id] ?? true;
                   const doneCount = group.tasks.filter((task) => task.status === 'done').length;
 
+                  // Nothing planned for the day: the goal stays in sight, with why.
+                  if (group.tasks.length === 0) {
+                    return (
+                      <article className="goal-today nested-accordion is-idle" key={group.goal.id}>
+                        <div className="goal-accordion-header">
+                          <span className="goal-accordion-copy">
+                            <strong>{group.goal.name}</strong>
+                            <small>{group.weekTotal > 0 ? 'на этот день задач нет' : 'на эту неделю задач нет'}</small>
+                          </span>
+                        </div>
+                      </article>
+                    );
+                  }
+
+                  const goalOpen = openGoals[group.goal.id] ?? true;
                   return (
                     <article className="goal-today nested-accordion" key={group.goal.id}>
                       <button

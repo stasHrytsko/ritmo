@@ -115,12 +115,12 @@ function WeekBody({ data, onChange }: { data: WeekView; onChange: (view: PeriodV
           <SectionHeader title="Цели" meta={`${data.goalDone}/${data.goalTotal}`} />
           <div className="progress-list">
             {data.goalProgress.map((item) => (
-              <div className="goal-progress-row" key={item.goal.id}>
+              <div className={`goal-progress-row${item.total === 0 ? ' is-idle' : ''}`} key={item.goal.id}>
                 <div className="goal-progress-copy">
                   <strong>{item.goal.name}</strong>
-                  <span>{item.done}/{item.total} на этой неделе</span>
+                  <span>{item.total > 0 ? `${item.done}/${item.total} на этой неделе` : 'задач на неделю нет'}</span>
                 </div>
-                <ProgressBar done={item.done} total={item.total} />
+                {item.total > 0 && <ProgressBar done={item.done} total={item.total} />}
               </div>
             ))}
           </div>

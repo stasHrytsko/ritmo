@@ -1495,6 +1495,14 @@ input {
   letter-spacing: 0;
 }
 
+.goal-today.is-idle .goal-accordion-header {
+  cursor: default;
+}
+
+.goal-progress-row.is-idle .goal-progress-copy strong {
+  color: var(--muted);
+}
+
 .goal-task-list {
   padding-bottom: 2px;
 }

@@ -603,3 +603,41 @@ describe('the install week', () => {
     expect((await service.getToday()).week[0].medal).toBe(false);
   });
 });
+
+describe('goals stay in sight', () => {
+  it('shows an active goal on Today even with nothing planned', async () => {
+    await service.createGoal('Repaint the hallway', '2026-09-18', '2026-10-18');
+
+    const { goals } = await service.getToday();
+    expect(goals.map((item) => item.goal.name)).toEqual(['Repaint the hallway']);
+    expect(goals[0].tasks).toEqual([]);
+    expect(goals[0].weekTotal).toBe(0);
+  });
+
+  it('tells "nothing today" from "nothing this week"', async () => {
+    await service.createGoal('Repaint the hallway', '2026-09-18', '2026-10-18');
+    const goal = store.goals[0];
+    await service.addGoalTask(goal.id, 'Buy paint', '2026-09-20');
+
+    const [item] = (await service.getToday()).goals;
+    expect(item.tasks).toEqual([]);
+    expect(item.weekTotal).toBe(1);
+  });
+
+  it('lists an active goal in the week with nothing planned', async () => {
+    await service.createGoal('Repaint the hallway', '2026-09-18', '2026-10-18');
+
+    const week = await service.getWeek();
+    expect(week.goalProgress.map((item) => [item.goal.name, item.total])).toEqual([['Repaint the hallway', 0]]);
+    // The percentage card still has nothing to say, so it stays empty.
+    expect(week.goalTotal).toBe(0);
+  });
+
+  it('keeps a finished goal out of the week once nothing is left in it', async () => {
+    await service.createGoal('Old goal', '2026-08-01', '2026-08-31');
+    await service.updateGoal({ ...store.goals[0], status: 'done' });
+
+    expect((await service.getWeek()).goalProgress).toEqual([]);
+    expect((await service.getToday()).goals).toEqual([]);
+  });
+});

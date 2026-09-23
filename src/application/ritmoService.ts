@@ -64,7 +64,13 @@ export interface TodayView {
   routines: RoutineDayState[];
   medal: boolean;
   week: DayStrip[];
-  goals: Array<{ goal: Goal; tasks: GoalTask[] }>;
+  /**
+   * Every active goal, so a goal is never out of sight just because nothing
+   * is planned for it yet. `tasks` are the ones for the day on screen;
+   * `weekTotal` counts the whole week, to tell "nothing today" from "nothing
+   * this week".
+   */
+  goals: Array<{ goal: Goal; tasks: GoalTask[]; weekTotal: number }>;
   daysLeft: number;
   weeksLeft: number;
   /** Share of the current year already lived, 0..1. */
@@ -312,14 +318,14 @@ export class RitmoService {
         await this.trackingStart(await this.repos.weeks.list()),
         dateKey
       ),
-      goals: goals
-        .map((goal) => ({
+      goals: goals.map((goal) => {
+        const forWeek = weekTasks.filter((task) => task.goalId === goal.id);
+        return {
           goal,
-          tasks: weekTasks.filter(
-            (task) => task.goalId === goal.id && (!task.plannedDate || task.plannedDate === dateKey)
-          )
-        }))
-        .filter((item) => item.tasks.length > 0),
+          tasks: forWeek.filter((task) => !task.plannedDate || task.plannedDate === dateKey),
+          weekTotal: forWeek.length
+        };
+      }),
       daysLeft: daysLeftInYear(today),
       weeksLeft: weeksLeftInYear(today),
       yearProgress: (dayOfYear(today) - 1) / daysInYear(today.getFullYear()),
@@ -663,7 +669,9 @@ export class RitmoService {
           total: goalTasks.length
         };
       })
-      .filter((item) => item.total > 0);
+      // Active goals stay listed with nothing planned; finished ones only
+      // while they still have tasks this week.
+      .filter((item) => item.total > 0 || item.goal.status === 'active');
 
     return {
       week,
