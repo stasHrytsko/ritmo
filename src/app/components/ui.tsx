@@ -54,13 +54,15 @@ export function ProgressSummary({ title, done, total }: { title: string; done: n
     <div className="summary-card">
       <span>{title}</span>
       <strong>{percent}%</strong>
-      <small>{done}/{total} complete</small>
+      <small>{done} из {total}</small>
       <ProgressBar done={done} total={total} />
     </div>
   );
 }
 
 export type PeriodView = 'week' | 'month' | 'year';
+
+const PERIOD_LABELS: Record<PeriodView, string> = { week: 'Неделя', month: 'Месяц', year: 'Год' };
 
 export function PeriodSwitch({
   current,
@@ -79,7 +81,7 @@ export function PeriodSwitch({
           aria-current={current === period ? 'page' : undefined}
           onClick={() => onChange(period)}
         >
-          {period}
+          {PERIOD_LABELS[period]}
         </button>
       ))}
     </div>

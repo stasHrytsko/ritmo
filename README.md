@@ -12,7 +12,8 @@ It separates two kinds of progress:
 ## V1 features
 
 - Today view with days/weeks left in the year
-- Routine completion
+- Routine completion, including earlier days of the current week (tap a day in the week strip)
+- Partial daily progress: rings in the week strip, fill in the month calendar
 - Automatic satisfaction for routines not scheduled that day
 - Daily medal when every routine requirement for the day is satisfied
 - Weekly sprint overview
@@ -132,10 +133,12 @@ The code is intentionally prepared for future storage migration/sync while keepi
 
 V1 is intentionally mobile-first and has four permanent bottom sections:
 
-- **Today** — current day with Goals and Routine
-- **Progress** — progress with Week / Month / Year switch
-- **Life** — Routine / Goals editor and list
-- **Notes** — named lists of entries, the backlog goals come from
+- **Сегодня** — current day with Goals and Routine; any day of the week from the strip
+- **Прогресс** — progress with Week / Month / Year switch
+- **Жизнь** — Routine / Goals editor and list
+- **Заметки** — named lists of entries, the backlog goals come from
+
+The interface is in Russian.
 
 ## Install as PWA
 

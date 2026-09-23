@@ -1,5 +1,6 @@
 import {
   SCHEMA_VERSION,
+  type ISODate,
   type Goal,
   type GoalTask,
   type Note,
@@ -39,22 +40,35 @@ export interface DayStrip {
   medal: boolean;
   isToday: boolean;
   future: boolean;
+  /** Day on screen in Today; defaults to the current day. */
+  selected: boolean;
+  /** Share of the day's scheduled routines done, 0..1. Zero for future days. */
+  progress: number;
 }
 
 export interface TodayView {
+  /** The day on screen. Not necessarily the current one. */
   date: Date;
+  /** The day the user is actually living. */
+  today: Date;
+  isToday: boolean;
+  /** Past and current days can be ticked; days ahead are view-only. */
+  editable: boolean;
   routines: RoutineDayState[];
   medal: boolean;
   week: DayStrip[];
   goals: Array<{ goal: Goal; tasks: GoalTask[] }>;
   daysLeft: number;
   weeksLeft: number;
+  /** Share of the current year already lived, 0..1. */
+  yearProgress: number;
 }
 
 export interface WeekDayProgress {
   date: Date;
   scheduled: boolean;
   done: boolean;
+  future: boolean;
 }
 
 export interface WeekView {
@@ -78,7 +92,7 @@ export interface WeekView {
 export interface MonthView {
   date: Date;
   name: string;
-  days: Array<{ date: Date; medal: boolean; known: boolean }>;
+  days: Array<{ date: Date; medal: boolean; known: boolean; progress: number }>;
   medalCount: number;
   knownDays: number;
   goals: Array<{ goal: Goal; done: number; total: number }>;
@@ -227,12 +241,24 @@ export class RitmoService {
     return record;
   }
 
-  async getToday(at = new Date()): Promise<TodayView> {
-    const date = this.today(at);
-    const week = await this.ensureWeek(date);
-    await this.rolloverOpenGoalTasks(week, date);
+  getToday(at = new Date()): Promise<TodayView> {
+    return this.getDay(undefined, at);
+  }
 
-    const dateKey = toISODate(date);
+  /**
+   * Any day of the current week, so a routine forgotten last night can still
+   * be ticked off. Anything outside the current week falls back to today.
+   */
+  async getDay(dayKey?: ISODate, at = new Date()): Promise<TodayView> {
+    const today = this.today(at);
+    const week = await this.ensureWeek(today);
+    await this.rolloverOpenGoalTasks(week, today);
+
+    const todayKey = toISODate(today);
+    const inWeek = dayKey !== undefined && dayKey >= week.startDate && dayKey <= week.endDate;
+    const dateKey = inWeek ? dayKey : todayKey;
+    const date = fromISODate(dateKey);
+
     const weekCompletions = await this.repos.completions.listBetween(week.startDate, week.endDate);
     const states = getRoutineDayStates(
       planForDate(week, dateKey),
@@ -245,9 +271,12 @@ export class RitmoService {
 
     return {
       date,
+      today,
+      isToday: dateKey === todayKey,
+      editable: dateKey <= todayKey,
       routines: states,
       medal: hasDayMedal(states),
-      week: this.buildDayStrip(week, weekCompletions, date),
+      week: this.buildDayStrip(week, weekCompletions, today, dateKey),
       goals: goals
         .map((goal) => ({
           goal,
@@ -256,12 +285,15 @@ export class RitmoService {
           )
         }))
         .filter((item) => item.tasks.length > 0),
-      daysLeft: daysLeftInYear(date),
-      weeksLeft: weeksLeftInYear(date)
+      daysLeft: daysLeftInYear(today),
+      weeksLeft: weeksLeftInYear(today),
+      yearProgress: (dayOfYear(today) - 1) / daysInYear(today.getFullYear())
     };
   }
 
   async toggleRoutine(date: Date, routineId: string) {
+    // A day that has not happened yet cannot be ticked off.
+    if (toISODate(date) > toISODate(this.today())) return;
     // One atomic read-modify-write, so a double tap cannot lose an update.
     await this.repos.completions.toggle(toISODate(date), routineId, now());
   }
@@ -342,7 +374,8 @@ export class RitmoService {
   private buildDayStrip(
     week: WeekRecord,
     completions: Awaited<ReturnType<Repositories['completions']['list']>>,
-    today: Date
+    today: Date,
+    selectedKey = toISODate(today)
   ): DayStrip[] {
     const todayKey = toISODate(today);
     return Array.from({ length: 7 }, (_, index) => {
@@ -359,7 +392,9 @@ export class RitmoService {
         date: day,
         medal: !future && hasDayMedal(states),
         isToday: key === todayKey,
-        future
+        future,
+        selected: key === selectedKey,
+        progress: future ? 0 : dayProgress(states)
       };
     });
   }
@@ -488,9 +523,11 @@ export class RitmoService {
     const tasks = await this.repos.goalTasks.listByWeek(week.id);
     const goals = (await this.repos.goals.list()).filter((goal) => goal.status !== 'paused');
     const goalMap = new Map(goals.map((goal) => [goal.id, goal]));
+    const todayKey = toISODate(today);
 
-    const routineProgress = routinesInWeek(week)
+    const routineProgress = [...routinesInWeek(week)]
       .filter((routine) => routine.active)
+      .sort(byTimeOfDay)
       .map((routine) => {
         const days = Array.from({ length: 7 }, (_, index) => {
           const day = addDays(fromISODate(week.startDate), index);
@@ -503,9 +540,10 @@ export class RitmoService {
           const done = completions.some(
             (item) => item.date === key && item.routineId === routine.routineId && item.done
           );
-          return { date: day, scheduled, done };
+          return { date: day, scheduled, done, future: key > todayKey };
         });
-        const scheduledDays = days.filter((item) => item.scheduled);
+        // Days still ahead are not owed yet, so they do not count against the week.
+        const scheduledDays = days.filter((item) => item.scheduled && !item.future);
         return {
           routine,
           days,
@@ -559,14 +597,14 @@ export class RitmoService {
       const day = new Date(year, month, index + 1);
       const key = toISODate(day);
       const week = weeks.find((item) => key >= item.startDate && key <= item.endDate);
-      if (!week || key > todayKey) return { date: day, medal: false, known: false };
+      if (!week || key > todayKey) return { date: day, medal: false, known: false, progress: 0 };
 
       const states = getRoutineDayStates(
         planForDate(week, key),
         completions.filter((item) => item.date === key),
         day
       );
-      return { date: day, medal: hasDayMedal(states), known: true };
+      return { date: day, medal: hasDayMedal(states), known: true, progress: dayProgress(states) };
     });
 
     const goals = await this.repos.goals.list();
@@ -644,7 +682,7 @@ export class RitmoService {
       this.repos.goals.list(),
       this.repos.goalTasks.list()
     ]);
-    return { routines, goals, tasks };
+    return { routines: [...routines].sort(byTimeOfDay), goals, tasks };
   }
 
   exportBackup() {
@@ -654,6 +692,25 @@ export class RitmoService {
   importBackup(payload: Parameters<Repositories['backup']['importAll']>[0]) {
     return this.repos.backup.importAll(payload);
   }
+}
+
+/**
+ * Share of a day's scheduled routines that are done. A day with nothing
+ * scheduled counts as complete, matching the medal rule.
+ */
+export function dayProgress(states: RoutineDayState[]) {
+  const scheduled = states.filter((state) => state.scheduled);
+  if (scheduled.length === 0) return states.length > 0 ? 1 : 0;
+  return scheduled.filter((state) => state.done).length / scheduled.length;
+}
+
+/** Timed routines by clock time, anytime ones after them, then by name. */
+function byTimeOfDay(
+  a: { timing?: Routine['timing']; time?: string; name: string },
+  b: { timing?: Routine['timing']; time?: string; name: string }
+) {
+  const keyOf = (item: typeof a) => (item.timing === 'exact' && item.time ? item.time : '99:99');
+  return keyOf(a).localeCompare(keyOf(b)) || a.name.localeCompare(b.name, 'ru');
 }
 
 function sortWeekdays(weekdays: number[]) {

@@ -152,5 +152,5 @@ export const parseBackup = (raw: unknown): BackupPayload => {
 
 /** Rough size of a backup, for the confirmation prompt. */
 export const describeBackup = (payload: BackupPayload) =>
-  `${payload.routines.length} routines, ${payload.goals.length} goals, `
-  + `${payload.notes.length} notes, ${payload.completions.length} completion records`;
+  `рутин: ${payload.routines.length}, целей: ${payload.goals.length}, `
+  + `заметок: ${payload.notes.length}, отметок: ${payload.completions.length}`;

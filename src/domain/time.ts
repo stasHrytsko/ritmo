@@ -75,14 +75,37 @@ export const logicalDay = (now: Date, boundaryHour: number): Date => {
 export const logicalDayKey = (now: Date, boundaryHour: number): ISODate =>
   toISODate(logicalDay(now, boundaryHour));
 
+const LOCALE = 'ru';
+
+const capitalize = (value: string) => value.charAt(0).toUpperCase() + value.slice(1);
+
+/** Standalone month name, capitalised: «Сентябрь». */
 export const monthName = (date: Date, style: 'long' | 'short' = 'long') =>
-  new Intl.DateTimeFormat('en', { month: style }).format(date);
+  capitalize(new Intl.DateTimeFormat(LOCALE, { month: style }).format(date).replace('.', ''));
+
+/** «23 сентября» — day with the month in the genitive case. */
+export const dayMonth = (date: Date) =>
+  new Intl.DateTimeFormat(LOCALE, { day: 'numeric', month: 'long' }).format(date);
+
+/** Genitive month on its own: «сентября». */
+export const monthGenitive = (date: Date) => dayMonth(date).replace(/^\d+\s*/, '');
 
 export const weekdayName = (date: Date, style: 'long' | 'short' = 'long') =>
-  new Intl.DateTimeFormat('en', { weekday: style }).format(date);
+  new Intl.DateTimeFormat(LOCALE, { weekday: style }).format(date);
+
+/** Monday-first single letters for grids and strips. */
+export const WEEKDAY_LETTERS = ['П', 'В', 'С', 'Ч', 'П', 'С', 'В'];
 
 export const formatRange = (start: Date, end: Date) => {
-  const startText = new Intl.DateTimeFormat('en', { month: 'short', day: 'numeric' }).format(start);
-  const endText = new Intl.DateTimeFormat('en', { month: 'short', day: 'numeric' }).format(end);
-  return `${startText} — ${endText}`;
+  const format = new Intl.DateTimeFormat(LOCALE, { day: 'numeric', month: 'short' });
+  return `${format.format(start).replace('.', '')} — ${format.format(end).replace('.', '')}`;
+};
+
+/** Russian plural: plural(5, ['день', 'дня', 'дней']) → 'дней'. */
+export const plural = (count: number, forms: [string, string, string]) => {
+  const mod10 = Math.abs(count) % 10;
+  const mod100 = Math.abs(count) % 100;
+  if (mod10 === 1 && mod100 !== 11) return forms[0];
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return forms[1];
+  return forms[2];
 };

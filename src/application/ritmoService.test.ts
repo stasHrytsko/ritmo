@@ -379,3 +379,70 @@ describe('year view', () => {
     expect(year.totalDays).toBe(365);
   });
 });
+
+describe('other days of the week', () => {
+  // A routine created on Monday belongs to every day of the week so far.
+  const addFromMonday = async (name: string) => {
+    vi.setSystemTime(new Date('2026-09-14T10:00:00+02:00'));
+    const routine = await addRoutine(name);
+    vi.setSystemTime(NOW);
+    return routine;
+  };
+
+  it('opens an earlier day and lets it be ticked off', async () => {
+    const walk = await addFromMonday('Walk');
+
+    const wednesday = await service.getDay('2026-09-16');
+    expect(toISODate(wednesday.date)).toBe('2026-09-16');
+    expect(wednesday.isToday).toBe(false);
+    expect(wednesday.editable).toBe(true);
+
+    await service.toggleRoutine(wednesday.date, walk.id);
+    expect(store.completions.map((item) => item.date)).toEqual(['2026-09-16']);
+    expect((await service.getDay('2026-09-16')).medal).toBe(true);
+  });
+
+  it('shows a day ahead but refuses to tick it', async () => {
+    const walk = await addFromMonday('Walk');
+
+    const saturday = await service.getDay('2026-09-19');
+    expect(saturday.editable).toBe(false);
+
+    await service.toggleRoutine(saturday.date, walk.id);
+    expect(store.completions).toHaveLength(0);
+  });
+
+  it('falls back to today outside the current week', async () => {
+    const view = await service.getDay('2026-09-01');
+    expect(toISODate(view.date)).toBe('2026-09-18');
+    expect(view.isToday).toBe(true);
+  });
+
+  it('marks the open day in the strip and keeps the year count on today', async () => {
+    const view = await service.getDay('2026-09-15');
+    expect(view.week.filter((day) => day.selected).map((day) => toISODate(day.date)))
+      .toEqual(['2026-09-15']);
+    expect(view.daysLeft).toBe((await service.getToday()).daysLeft);
+  });
+
+  it('reports partial progress per day', async () => {
+    const walk = await addFromMonday('Walk');
+    await addFromMonday('Gym');
+    await service.toggleRoutine(service.today(), walk.id);
+
+    const friday = (await service.getToday()).week.find((day) => day.isToday)!;
+    expect(friday.progress).toBe(0.5);
+    expect(friday.medal).toBe(false);
+  });
+});
+
+describe('week totals', () => {
+  it('count only the days already lived', async () => {
+    vi.setSystemTime(new Date('2026-09-14T10:00:00+02:00'));
+    await addRoutine('Walk');
+    vi.setSystemTime(NOW);
+
+    const week = await service.getWeek();
+    expect(week.routineTotal).toBe(5);
+  });
+});

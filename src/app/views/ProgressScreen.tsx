@@ -1,5 +1,5 @@
 import type { MonthView, WeekView, YearView } from '../../application/ritmoService';
-import { isoWeekday } from '../../domain/time';
+import { WEEKDAY_LETTERS, isoWeekday, plural } from '../../domain/time';
 import { Empty, PeriodSwitch, ProgressBar, ProgressSummary, SectionHeader, type PeriodView } from '../components/ui';
 
 export type ProgressData =
@@ -28,19 +28,22 @@ function WeekBody({ data, onChange }: { data: WeekView; onChange: (view: PeriodV
     <>
       <div className="progress-heading">
         <div>
-          <div className="eyebrow">Week {data.week.weekNumber}</div>
+          <div className="eyebrow">Неделя {data.week.weekNumber}</div>
           <h1>{data.label}</h1>
         </div>
       </div>
       <PeriodSwitch current="week" onChange={onChange} />
 
       <div className="summary-grid">
-        <ProgressSummary title="Routine" done={data.routineDone} total={data.routineTotal} />
-        <ProgressSummary title="Goals" done={data.goalDone} total={data.goalTotal} />
+        <ProgressSummary title="Рутина" done={data.routineDone} total={data.routineTotal} />
+        <ProgressSummary title="Цели" done={data.goalDone} total={data.goalTotal} />
       </div>
 
       <section className="content-block">
-        <SectionHeader title="Routine" meta={`${data.routineDone}/${data.routineTotal}`} />
+        <SectionHeader title="Рутина" meta={`${data.routineDone}/${data.routineTotal}`} />
+        <div className="week-dots week-dots-head" aria-hidden="true">
+          {WEEKDAY_LETTERS.map((letter, index) => <span key={index}>{letter}</span>)}
+        </div>
         <div className="progress-list">
           {data.routineProgress.map((item) => (
             <div className="weekly-row" key={item.routine.routineId}>
@@ -52,7 +55,9 @@ function WeekBody({ data, onChange }: { data: WeekView; onChange: (view: PeriodV
                 {item.days.map((day) => (
                   <span
                     key={day.date.toISOString()}
-                    className={!day.scheduled ? 'off' : day.done ? 'done' : 'pending'}
+                    className={
+                      !day.scheduled ? 'off' : day.done ? 'done' : day.future ? 'ahead' : 'pending'
+                    }
                   >
                     {day.done ? '✓' : ''}
                   </span>
@@ -60,23 +65,23 @@ function WeekBody({ data, onChange }: { data: WeekView; onChange: (view: PeriodV
               </div>
             </div>
           ))}
-          {data.routineProgress.length === 0 && <Empty text="No routines yet." />}
+          {data.routineProgress.length === 0 && <Empty text="Рутин пока нет." />}
         </div>
       </section>
 
       <section className="content-block">
-        <SectionHeader title="Goals" meta={`${data.goalDone}/${data.goalTotal}`} />
+        <SectionHeader title="Цели" meta={`${data.goalDone}/${data.goalTotal}`} />
         <div className="progress-list">
           {data.goalProgress.map((item) => (
             <div className="goal-progress-row" key={item.goal.id}>
               <div className="goal-progress-copy">
                 <strong>{item.goal.name}</strong>
-                <span>{item.done}/{item.total} this week</span>
+                <span>{item.done}/{item.total} на этой неделе</span>
               </div>
               <ProgressBar done={item.done} total={item.total} />
             </div>
           ))}
-          {data.goalProgress.length === 0 && <Empty text="No goal tasks this week." />}
+          {data.goalProgress.length === 0 && <Empty text="На этой неделе задач по целям нет." />}
         </div>
       </section>
     </>
@@ -95,19 +100,19 @@ function MonthBody({ data, onChange }: { data: MonthView; onChange: (view: Perio
 
       <div className="summary-grid one-line">
         <div className="summary-card">
-          <span>Day medals</span>
+          <span>Медали</span>
           <strong>{data.medalCount}</strong>
-          <small>{data.knownDays} tracked days</small>
+          <small>из {data.knownDays} {plural(data.knownDays, ['дня', 'дней', 'дней'])}</small>
         </div>
         <div className="summary-card">
-          <span>Month</span>
+          <span>Месяц</span>
           <strong>{data.date.getMonth() + 1}</strong>
-          <small>of 12</small>
+          <small>из 12</small>
         </div>
       </div>
 
       <div className="calendar-head">
-        {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((label, index) => (
+        {WEEKDAY_LETTERS.map((label, index) => (
           <span key={index}>{label}</span>
         ))}
       </div>
@@ -117,7 +122,11 @@ function MonthBody({ data, onChange }: { data: MonthView; onChange: (view: Perio
           <div
             className={`month-day ${day.medal ? 'earned' : ''} ${!day.known ? 'unknown' : ''}`}
             key={day.date.toISOString()}
+            aria-label={day.known ? `${day.date.getDate()}: ${Math.round(day.progress * 100)}%` : undefined}
           >
+            {day.known && !day.medal && day.progress > 0 && (
+              <i className="month-fill" style={{ height: `${Math.round(day.progress * 100)}%` }} />
+            )}
             <span>{day.date.getDate()}</span>
             {day.medal && <b>✓</b>}
           </div>
@@ -125,18 +134,18 @@ function MonthBody({ data, onChange }: { data: MonthView; onChange: (view: Perio
       </div>
 
       <section className="content-block">
-        <SectionHeader title="Goals" meta="" />
+        <SectionHeader title="Цели" meta="" />
         <div className="progress-list">
           {data.goals.map((item) => (
             <div className="goal-progress-row" key={item.goal.id}>
               <div className="goal-progress-copy">
                 <strong>{item.goal.name}</strong>
-                <span>{item.done}/{item.total} tasks</span>
+                <span>{item.done}/{item.total} {plural(item.total, ['задача', 'задачи', 'задач'])}</span>
               </div>
               <ProgressBar done={item.done} total={item.total} />
             </div>
           ))}
-          {data.goals.length === 0 && <Empty text="No goals yet." />}
+          {data.goals.length === 0 && <Empty text="Целей пока нет." />}
         </div>
       </section>
     </>
@@ -149,23 +158,23 @@ function YearBody({ data, onChange }: { data: YearView; onChange: (view: PeriodV
 
   return (
     <>
-      <div className="eyebrow">Year</div>
+      <div className="eyebrow">Год</div>
       <div className="year-title">
         <h1>{data.year}</h1>
-        <div><strong>{data.currentDay}</strong><span>day of {data.totalDays}</span></div>
+        <div><strong>{data.currentDay}</strong><span>день из {data.totalDays}</span></div>
       </div>
       <PeriodSwitch current="year" onChange={onChange} />
 
       <div className="summary-grid">
         <div className="summary-card">
-          <span>Days left</span>
+          <span>Осталось дней</span>
           <strong>{data.daysLeft}</strong>
-          <small>until year end</small>
+          <small>до конца года</small>
         </div>
         <div className="summary-card">
-          <span>Weeks left</span>
+          <span>Осталось недель</span>
           <strong>{data.weeksLeft}</strong>
-          <small>approximately</small>
+          <small>примерно</small>
         </div>
       </div>
 
@@ -187,7 +196,7 @@ function YearBody({ data, onChange }: { data: YearView; onChange: (view: PeriodV
                 </div>
                 <div className="quarter-meta">
                   <b>{medals}</b>
-                  <span>medals</span>
+                  <span>{plural(medals, ['медаль', 'медали', 'медалей'])}</span>
                 </div>
               </div>
 
@@ -195,7 +204,7 @@ function YearBody({ data, onChange }: { data: YearView; onChange: (view: PeriodV
                 {months.map((month) => (
                   <div className="month-card" key={month.month}>
                     <strong>{month.label.toUpperCase()}</strong>
-                    <span>{month.medals} medals</span>
+                    <span>{month.medals} {plural(month.medals, ['медаль', 'медали', 'медалей'])}</span>
                     <div className="month-bar">
                       <i style={{
                         width: `${month.knownDays ? Math.round((month.medals / month.knownDays) * 100) : 0}%`
@@ -208,8 +217,8 @@ function YearBody({ data, onChange }: { data: YearView; onChange: (view: PeriodV
               <div className="quarter-progress">
                 <span>
                   {knownDays
-                    ? `${Math.round((medals / knownDays) * 100)}% of tracked days with medals`
-                    : 'No tracked days yet'}
+                    ? `${Math.round((medals / knownDays) * 100)}% отмеченных дней с медалью`
+                    : 'Отмеченных дней пока нет'}
                 </span>
               </div>
             </section>

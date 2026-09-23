@@ -136,6 +136,6 @@ describe('parseBackup', () => {
 describe('describeBackup', () => {
   it('summarises what a restore would replace', () => {
     expect(describeBackup(parseBackup(valid())))
-      .toBe('1 routines, 1 goals, 0 notes, 1 completion records');
+      .toBe('рутин: 1, целей: 1, заметок: 0, отметок: 1');
   });
 });

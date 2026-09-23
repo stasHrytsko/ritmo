@@ -29,13 +29,13 @@ export interface BeforeInstallPromptEvent extends Event {
 }
 
 const WEEKDAYS = [
-  { value: 1, label: 'M', name: 'Monday' },
-  { value: 2, label: 'T', name: 'Tuesday' },
-  { value: 3, label: 'W', name: 'Wednesday' },
-  { value: 4, label: 'T', name: 'Thursday' },
-  { value: 5, label: 'F', name: 'Friday' },
-  { value: 6, label: 'S', name: 'Saturday' },
-  { value: 7, label: 'S', name: 'Sunday' }
+  { value: 1, label: 'П', short: 'Пн', name: 'Понедельник' },
+  { value: 2, label: 'В', short: 'Вт', name: 'Вторник' },
+  { value: 3, label: 'С', short: 'Ср', name: 'Среда' },
+  { value: 4, label: 'Ч', short: 'Чт', name: 'Четверг' },
+  { value: 5, label: 'П', short: 'Пт', name: 'Пятница' },
+  { value: 6, label: 'С', short: 'Сб', name: 'Суббота' },
+  { value: 7, label: 'В', short: 'Вс', name: 'Воскресенье' }
 ];
 
 const ALL_WEEKDAYS = WEEKDAYS.map((day) => day.value);
@@ -142,8 +142,8 @@ export function LifeScreen({
 
   return (
     <section className="screen life-screen">
-      <div className="eyebrow">Edit</div>
-      <h1>Life</h1>
+      <div className="eyebrow">Настройка</div>
+      <h1>Жизнь</h1>
 
       <div className="segmented">
         <button
@@ -152,7 +152,7 @@ export function LifeScreen({
           aria-current={tab === 'routines' ? 'page' : undefined}
           onClick={() => { setTab('routines'); setEditorOpen(false); }}
         >
-          Routine
+          Рутина
         </button>
         <button
           type="button"
@@ -160,13 +160,13 @@ export function LifeScreen({
           aria-current={tab === 'goals' ? 'page' : undefined}
           onClick={() => { setTab('goals'); setEditorOpen(false); }}
         >
-          Goals
+          Цели
         </button>
       </div>
 
       <button type="button" className="add-new" onClick={openNew}>
         <span>＋</span>
-        Add new {tab === 'routines' ? 'routine' : 'goal'}
+        {tab === 'routines' ? 'Новая рутина' : 'Новая цель'}
       </button>
 
       {tab === 'routines' && (
@@ -190,14 +190,14 @@ export function LifeScreen({
               <span>
                 <strong>{routine.name}</strong>
                 <small>
-                  {formatSchedule(routine.weekdays)} · {routine.timing === 'exact' && routine.time ? routine.time : 'Anytime'}
+                  {formatSchedule(routine.weekdays)} · {routine.timing === 'exact' && routine.time ? routine.time : 'в любое время'}
                 </small>
               </span>
-              <b>{routine.active ? 'On' : 'Off'}</b>
+              <b>{routine.active ? 'Вкл' : 'Выкл'}</b>
               <i>›</i>
             </button>
           ))}
-          {data.routines.length === 0 && <Empty text="No routines yet." />}
+          {data.routines.length === 0 && <Empty text="Рутин пока нет." />}
         </div>
       )}
 
@@ -231,24 +231,24 @@ export function LifeScreen({
               </button>
             );
           })}
-          {data.goals.length === 0 && <Empty text="No goals yet." />}
+          {data.goals.length === 0 && <Empty text="Целей пока нет." />}
         </div>
       )}
 
       {editorOpen && tab === 'routines' && (
-        <EditorSheet title={routineDraft.id ? 'Edit routine' : 'New routine'} onClose={closeRoutineEditor}>
+        <EditorSheet title={routineDraft.id ? 'Рутина' : 'Новая рутина'} onClose={closeRoutineEditor}>
           <label className="field">
-            <span>Name</span>
+            <span>Название</span>
             <input
               autoFocus
               value={routineDraft.name}
               onChange={(event) => setRoutineDraft({ ...routineDraft, name: event.target.value })}
-              placeholder="Gym, water, walk Loki…"
+              placeholder="Зал, вода, выгулять Локи…"
             />
           </label>
 
           <div className="field">
-            <span id="routine-schedule-label">Schedule</span>
+            <span id="routine-schedule-label">Дни</span>
             <div className="weekday-picker" role="group" aria-labelledby="routine-schedule-label">
               {WEEKDAYS.map((day) => {
                 const selected = routineDraft.weekdays.includes(day.value);
@@ -276,7 +276,7 @@ export function LifeScreen({
           </div>
 
           <div className="field">
-            <span id="routine-timing-label">Time</span>
+            <span id="routine-timing-label">Время</span>
             <div className="timing-picker" role="group" aria-labelledby="routine-timing-label">
               <button
                 type="button"
@@ -284,7 +284,7 @@ export function LifeScreen({
                 aria-pressed={routineDraft.timing === 'exact'}
                 onClick={() => setRoutineDraft({ ...routineDraft, timing: 'exact' })}
               >
-                Exact time
+                Точное время
               </button>
               <button
                 type="button"
@@ -292,14 +292,14 @@ export function LifeScreen({
                 aria-pressed={routineDraft.timing === 'anytime'}
                 onClick={() => setRoutineDraft({ ...routineDraft, timing: 'anytime' })}
               >
-                Anytime
+                В любое время
               </button>
             </div>
           </div>
 
           {routineDraft.timing === 'exact' && (
             <label className="field">
-              <span>Exact time</span>
+              <span>Во сколько</span>
               <input
                 type="time"
                 value={routineDraft.time}
@@ -309,7 +309,7 @@ export function LifeScreen({
           )}
 
           <button type="button" className="primary" onClick={() => void saveRoutine()}>
-            {routineDraft.id ? 'Save changes' : 'Add routine'}
+            {routineDraft.id ? 'Сохранить' : 'Добавить рутину'}
           </button>
 
           {routineDraft.id && (
@@ -318,27 +318,27 @@ export function LifeScreen({
               className="danger-link"
               onClick={() => void onDeleteRoutine(routineDraft.id!).then(closeRoutineEditor)}
             >
-              Delete routine
+              Удалить рутину
             </button>
           )}
         </EditorSheet>
       )}
 
       {editorOpen && tab === 'goals' && (
-        <EditorSheet title={goalDraft.id ? 'Edit goal' : 'New goal'} onClose={closeGoalEditor}>
+        <EditorSheet title={goalDraft.id ? 'Цель' : 'Новая цель'} onClose={closeGoalEditor}>
           <label className="field">
-            <span>Name</span>
+            <span>Название</span>
             <input
               autoFocus
               value={goalDraft.name}
               onChange={(event) => setGoalDraft({ ...goalDraft, name: event.target.value })}
-              placeholder="Release first game"
+              placeholder="Выпустить первую игру"
             />
           </label>
 
           <div className="date-fields">
             <label className="field">
-              <span>Start</span>
+              <span>Начало</span>
               <input
                 type="date"
                 value={goalDraft.startDate}
@@ -346,7 +346,7 @@ export function LifeScreen({
               />
             </label>
             <label className="field">
-              <span>End</span>
+              <span>Конец</span>
               <input
                 type="date"
                 value={goalDraft.endDate}
@@ -356,14 +356,14 @@ export function LifeScreen({
           </div>
 
           <button type="button" className="primary" onClick={() => void saveGoal()}>
-            {goalDraft.id ? 'Save changes' : 'Add goal'}
+            {goalDraft.id ? 'Сохранить' : 'Добавить цель'}
           </button>
 
           {goalDraft.id && (
             <>
               <div className="editor-divider" />
               <div className="field">
-                <span>Tasks</span>
+                <span>Задачи</span>
                 <div className="editor-task-list">
                   {data.tasks
                     .filter((task) => task.goalId === goalDraft.id)
@@ -390,9 +390,9 @@ export function LifeScreen({
                         void addTask();
                       }
                     }}
-                    placeholder="Add weekly task"
+                    placeholder="Задача на неделю"
                   />
-                  <button type="button" aria-label="Add task" onClick={() => void addTask()}>＋</button>
+                  <button type="button" aria-label="Добавить задачу" onClick={() => void addTask()}>＋</button>
                 </div>
               </div>
 
@@ -401,7 +401,7 @@ export function LifeScreen({
                 className="danger-link"
                 onClick={() => void onDeleteGoal(goalDraft.id!).then(closeGoalEditor)}
               >
-                Delete goal
+                Удалить цель
               </button>
             </>
           )}
@@ -416,28 +416,28 @@ export function LifeScreen({
         <section className="utility-section">
           {installPrompt && (
             <button type="button" className="utility-row" onClick={onInstall}>
-              <span><strong>Install Ritmo</strong><small>Add it to your home screen</small></span>
+              <span><strong>Установить Ritmo</strong><small>Иконка на главном экране</small></span>
               <i>›</i>
             </button>
           )}
           {isIOS() && !isStandalone() && (
             <div className="ios-hint">
-              <strong>Add to Home Screen</strong>
-              <span>Safari → Share → Add to Home Screen</span>
+              <strong>На экран «Домой»</strong>
+              <span>Safari → Поделиться → На экран «Домой»</span>
             </div>
           )}
         </section>
       )}
 
       {dataMenuOpen && (
-        <EditorSheet title="Data" onClose={onCloseDataMenu}>
+        <EditorSheet title="Данные" onClose={onCloseDataMenu}>
           <div className="data-sheet-copy">
-            <strong>Local data</strong>
-            <span>Ritmo stores your routines, goals and tracking history on this device.</span>
+            <strong>Данные на устройстве</strong>
+            <span>Рутины, цели и вся история отметок хранятся только на этом устройстве.</span>
           </div>
           <div className="backup-actions">
-            <button type="button" onClick={onExport}>Export backup</button>
-            <button type="button" onClick={() => importRef.current?.click()}>Import backup</button>
+            <button type="button" onClick={onExport}>Сохранить бэкап</button>
+            <button type="button" onClick={() => importRef.current?.click()}>Восстановить из бэкапа</button>
             <input
               ref={importRef}
               hidden
@@ -457,9 +457,9 @@ export function LifeScreen({
 }
 
 const THEME_LABELS: Record<ThemePreference, string> = {
-  system: 'System',
-  light: 'Light',
-  dark: 'Dark'
+  system: 'Как в системе',
+  light: 'Светлая',
+  dark: 'Тёмная'
 };
 
 function ThemePicker() {
@@ -467,7 +467,7 @@ function ThemePicker() {
 
   return (
     <div className="field theme-field">
-      <span id="theme-label">Appearance</span>
+      <span id="theme-label">Тема</span>
       <div className="timing-picker theme-picker" role="group" aria-labelledby="theme-label">
         {THEME_PREFERENCES.map((option) => (
           <button
@@ -486,11 +486,14 @@ function ThemePicker() {
 }
 
 function formatSchedule(days: number[]) {
-  if (days.length === 7) return 'Every day';
+  if (days.length === 7) return 'Каждый день';
+  const key = [...days].sort((a, b) => a - b).join(',');
+  if (key === '1,2,3,4,5') return 'По будням';
+  if (key === '6,7') return 'По выходным';
   return [...days]
     .sort((a, b) => a - b)
-    .map((day) => WEEKDAYS[day - 1]?.label ?? '')
-    .join(' · ');
+    .map((day) => WEEKDAYS[day - 1]?.short ?? '')
+    .join(', ');
 }
 
 function isIOS() {

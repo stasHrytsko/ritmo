@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { GoalTask } from '../domain/types';
+import type { GoalTask, ISODate } from '../domain/types';
 import { logicalDayKey, toISODate } from '../domain/time';
 import { describeBackup, parseBackup } from '../domain/backup';
+import { hasDayMedal } from '../domain/medal';
 import { repositories } from '../infrastructure/repositories';
 import {
   RitmoService,
@@ -10,7 +11,8 @@ import {
   type NotesView,
   type TodayView,
   type WeekView,
-  type YearView
+  type YearView,
+  dayProgress
 } from '../application/ritmoService';
 import { NavButton } from './components/BottomNav';
 import type { PeriodView } from './components/ui';
@@ -36,7 +38,7 @@ type Screen =
 const isProgress = (view: View): view is PeriodView =>
   view === 'week' || view === 'month' || view === 'year';
 
-const TOPBAR_LABELS: Partial<Record<View, string>> = { day: 'Today', notes: 'Notes' };
+const TOPBAR_LABELS: Partial<Record<View, string>> = { day: 'Сегодня', notes: 'Заметки' };
 
 export function App() {
   const service = useMemo(() => new RitmoService(repositories), []);
@@ -46,13 +48,17 @@ export function App() {
   const [error, setError] = useState<string | null>(null);
   const [dataMenuOpen, setDataMenuOpen] = useState(false);
   const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
+  // Which day Today shows. Undefined means the current day, whatever it is.
+  const [selectedDay, setSelectedDay] = useState<ISODate | undefined>();
+  const selectedDayRef = useRef(selectedDay);
+  selectedDayRef.current = selectedDay;
 
   // Only the newest request is allowed to paint, so a slow response from a
   // screen the user already left cannot overwrite the one they are looking at.
   const pending = useRef(0);
 
   const load = useCallback(async (target: View): Promise<Screen> => {
-    if (target === 'day') return { view: 'day', data: await service.getToday() };
+    if (target === 'day') return { view: 'day', data: await service.getDay(selectedDayRef.current) };
     if (target === 'week') return { view: 'week', data: await service.getWeek() };
     if (target === 'month') return { view: 'month', data: await service.getMonth() };
     if (target === 'year') return { view: 'year', data: await service.getYear() };
@@ -60,6 +66,11 @@ export function App() {
     return { view: 'life', data: await service.getLife() };
   }, [service]);
 
+  /**
+   * Loads a screen without hiding or dimming the one already painted: the old
+   * screen stays until the new data is in, so taps and tab switches never
+   * flash a loader.
+   */
   const refresh = useCallback(async (target: View) => {
     const ticket = ++pending.current;
     setBusy(true);
@@ -96,11 +107,15 @@ export function App() {
 
   // The day can roll over while the app sits open. Poll cheaply and only act
   // when the logical day actually changes.
-  const dayKey = screen?.view === 'day' ? toISODate(screen.data.date) : null;
+  const dayKey = screen?.view === 'day' ? toISODate(screen.data.today) : null;
   useEffect(() => {
     if (!dayKey) return;
     const timer = window.setInterval(() => {
-      if (logicalDayKey(new Date(), service.dayBoundaryHour) !== dayKey) void refresh('day');
+      if (logicalDayKey(new Date(), service.dayBoundaryHour) !== dayKey) {
+        setSelectedDay(undefined);
+        selectedDayRef.current = undefined;
+        void refresh('day');
+      }
     }, 30_000);
     return () => window.clearInterval(timer);
   }, [dayKey, service, refresh]);
@@ -116,20 +131,49 @@ export function App() {
 
   const navigate = (target: View) => {
     if (target === view) return;
-    setScreen(null);
+    // Leaving Today always brings you back to the current day next time.
+    if (target !== 'day') {
+      setSelectedDay(undefined);
+      selectedDayRef.current = undefined;
+    }
     setView(target);
     setDataMenuOpen(false);
     void refresh(target);
   };
 
-  const toggleRoutine = async (routineId: string) => {
+  const selectDay = (key: ISODate | undefined) => {
     if (screen?.view !== 'day') return;
-    await service.toggleRoutine(screen.data.date, routineId);
+    const next = key === toISODate(screen.data.today) ? undefined : key;
+    setSelectedDay(next);
+    selectedDayRef.current = next;
+    void refresh('day');
+  };
+
+  /**
+   * The tick shows straight away; the write and a quiet reload follow. If the
+   * write fails, the reload puts the screen back to what is really stored.
+   */
+  const toggleRoutine = async (routineId: string) => {
+    if (screen?.view !== 'day' || !screen.data.editable) return;
+    const data = screen.data;
+    setScreen({ view: 'day', data: withToggledRoutine(data, routineId) });
+    try {
+      await service.toggleRoutine(data.date, routineId);
+    } catch (cause) {
+      setError(describeError(cause));
+    }
     await refresh('day');
   };
 
   const toggleTask = async (task: GoalTask) => {
-    await service.toggleGoalTask(task);
+    if (screen?.view === 'day') {
+      setScreen({ view: 'day', data: withToggledTask(screen.data, task.id) });
+    }
+    try {
+      await service.toggleGoalTask(task);
+    } catch (cause) {
+      setError(describeError(cause));
+    }
     await refresh(view);
   };
 
@@ -158,8 +202,8 @@ export function App() {
       const payload = parseBackup(JSON.parse(await file.text()));
 
       const confirmed = window.confirm(
-        `Restore ${describeBackup(payload)}?\n\n`
-        + 'This replaces everything currently stored on this device.'
+        `Восстановить: ${describeBackup(payload)}?\n\n`
+        + 'Всё, что сейчас хранится на этом устройстве, будет заменено.'
       );
       if (!confirmed) return;
 
@@ -186,30 +230,30 @@ export function App() {
           <button
             type="button"
             className="topbar-menu"
-            aria-label="Data menu"
+            aria-label="Данные"
             onClick={() => setDataMenuOpen(true)}
           >
             ⋯
           </button>
         ) : (
-          <div className="topbar-mark">{TOPBAR_LABELS[view] ?? 'Progress'}</div>
+          <div className="topbar-mark">{screen?.view === 'day' && !screen.data.isToday ? 'День' : TOPBAR_LABELS[view] ?? 'Прогресс'}</div>
         )}
       </header>
 
-      <main className={busy ? 'loading' : ''}>
+      <main>
         {error && (
           <div className="error-banner" role="alert">
             <div>
-              <strong>Something went wrong</strong>
+              <strong>Что-то пошло не так</strong>
               <span>{error}</span>
             </div>
-            <button type="button" onClick={() => void (screen ? refresh(view) : start())}>Retry</button>
+            <button type="button" onClick={() => void (screen ? refresh(view) : start())}>Повторить</button>
           </div>
         )}
         {busy && !screen && !error && (
           <div className="screen-loader" role="status" aria-live="polite">
             <span />
-            <small>Loading</small>
+            <small>Загрузка</small>
           </div>
         )}
 
@@ -218,6 +262,7 @@ export function App() {
             data={screen.data}
             onToggleRoutine={toggleRoutine}
             onToggleTask={toggleTask}
+            onSelectDay={selectDay}
           />
         )}
 
@@ -324,15 +369,15 @@ export function App() {
       </main>
 
       <footer className="bottom-nav">
-        <NavButton label="Today" icon="today" active={view === 'day'} onClick={() => navigate('day')} />
+        <NavButton label="Сегодня" icon="today" active={view === 'day'} onClick={() => navigate('day')} />
         <NavButton
-          label="Progress"
+          label="Прогресс"
           icon="week"
           active={isProgress(view)}
           onClick={() => navigate(isProgress(view) ? view : 'week')}
         />
-        <NavButton label="Life" icon="life" active={view === 'life'} onClick={() => navigate('life')} />
-        <NavButton label="Notes" icon="notes" active={view === 'notes'} onClick={() => navigate('notes')} />
+        <NavButton label="Жизнь" icon="life" active={view === 'life'} onClick={() => navigate('life')} />
+        <NavButton label="Заметки" icon="notes" active={view === 'notes'} onClick={() => navigate('notes')} />
       </footer>
     </div>
   );
@@ -340,5 +385,36 @@ export function App() {
 
 function describeError(cause: unknown) {
   if (cause instanceof Error && cause.message) return cause.message;
-  return 'Unexpected error. Your data has not been changed.';
+  return 'Неожиданная ошибка. Данные не изменились.';
+}
+
+/** Today with one routine flipped, medal and strip recomputed to match. */
+function withToggledRoutine(data: TodayView, routineId: string): TodayView {
+  const routines = data.routines.map((state) => {
+    if (state.routine.routineId !== routineId) return state;
+    const done = !state.done;
+    return { ...state, done, satisfied: state.scheduled ? done : true };
+  });
+  const medal = hasDayMedal(routines);
+  const dateKey = toISODate(data.date);
+  return {
+    ...data,
+    routines,
+    medal,
+    week: data.week.map((day) =>
+      toISODate(day.date) === dateKey ? { ...day, medal, progress: dayProgress(routines) } : day
+    )
+  };
+}
+
+function withToggledTask(data: TodayView, taskId: string): TodayView {
+  return {
+    ...data,
+    goals: data.goals.map((group) => ({
+      ...group,
+      tasks: group.tasks.map((task) =>
+        task.id === taskId ? { ...task, status: task.status === 'done' ? 'open' : 'done' } : task
+      )
+    }))
+  };
 }

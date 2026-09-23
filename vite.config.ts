@@ -18,7 +18,7 @@ export default defineConfig({
         id: './',
         name: 'Ritmo',
         short_name: 'Ritmo',
-        description: 'Personal routine and goal tracker.',
+        description: 'Личный трекер рутины и целей.',
         theme_color: '#f3efe6',
         background_color: '#f3efe6',
         display: 'standalone',

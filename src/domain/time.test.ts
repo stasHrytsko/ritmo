@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   addDays,
+  plural,
   dayOfYear,
   daysBetween,
   daysInYear,
@@ -152,5 +153,14 @@ describe('addDays', () => {
   it('crosses the spring-forward day without losing it', () => {
     expect(toISODate(addDays(fromISODate('2026-03-28'), 1))).toBe('2026-03-29');
     expect(toISODate(addDays(fromISODate('2026-03-29'), 1))).toBe('2026-03-30');
+  });
+});
+
+describe('plural', () => {
+  it.each([
+    [1, 'день'], [2, 'дня'], [4, 'дня'], [5, 'дней'], [11, 'дней'], [12, 'дней'],
+    [14, 'дней'], [21, 'день'], [22, 'дня'], [99, 'дней'], [101, 'день'], [111, 'дней']
+  ])('%i → %s', (count, expected) => {
+    expect(plural(count, ['день', 'дня', 'дней'])).toBe(expected);
   });
 });

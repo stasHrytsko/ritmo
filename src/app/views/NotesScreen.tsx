@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { NotesView } from '../../application/ritmoService';
 import type { Note, NoteEntry } from '../../domain/types';
-import { addDays, toISODate } from '../../domain/time';
+import { addDays, plural, toISODate } from '../../domain/time';
 import { EditorSheet } from '../components/EditorSheet';
 import { Empty } from '../components/ui';
 
@@ -53,12 +53,12 @@ export function NotesScreen({
 
   return (
     <section className="screen notes-screen">
-      <div className="eyebrow">Backlog</div>
-      <h1>Notes</h1>
+      <div className="eyebrow">Бэклог</div>
+      <h1>Заметки</h1>
 
       <button type="button" className="add-new" onClick={() => setCreating(true)}>
         <span>＋</span>
-        Add new note
+        Новая заметка
       </button>
 
       <div className="notes-list">
@@ -79,14 +79,14 @@ export function NotesScreen({
                 >
                   <span className="goal-accordion-copy">
                     <strong>{note.title}</strong>
-                    <small>{entries.length} {entries.length === 1 ? 'entry' : 'entries'}</small>
+                    <small>{entries.length} {plural(entries.length, ['запись', 'записи', 'записей'])}</small>
                   </span>
                   <span className={`accordion-chevron ${open ? 'open' : ''}`}>⌄</span>
                 </button>
                 <button
                   type="button"
                   className="note-menu"
-                  aria-label={`Edit note: ${note.title}`}
+                  aria-label={`Изменить заметку: ${note.title}`}
                   onClick={() => setSheet({ kind: 'note', note })}
                 >
                   ⋯
@@ -106,13 +106,13 @@ export function NotesScreen({
                       <i>›</i>
                     </button>
                   ))}
-                  {entries.length === 0 && <Empty text="Nothing written down yet." />}
+                  {entries.length === 0 && <Empty text="Пока ничего не записано." />}
 
                   <div className="task-add">
                     <input
                       value={entryDrafts[note.id] ?? ''}
-                      aria-label={`Add to ${note.title}`}
-                      placeholder="Write another line…"
+                      aria-label={`Добавить в «${note.title}»`}
+                      placeholder="Ещё одна строка…"
                       onChange={(event) =>
                         setEntryDrafts((current) => ({ ...current, [note.id]: event.target.value }))
                       }
@@ -123,7 +123,7 @@ export function NotesScreen({
                         }
                       }}
                     />
-                    <button type="button" aria-label="Add line" onClick={() => void addEntry(note.id)}>
+                    <button type="button" aria-label="Добавить строку" onClick={() => void addEntry(note.id)}>
                       ＋
                     </button>
                   </div>
@@ -132,20 +132,20 @@ export function NotesScreen({
             </article>
           );
         })}
-        {data.notes.length === 0 && <Empty text="No notes yet." />}
+        {data.notes.length === 0 && <Empty text="Заметок пока нет." />}
       </div>
 
       {creating && (
         <EditorSheet
-          title="New note"
+          title="Новая заметка"
           onClose={() => { setTitleDraft(''); setCreating(false); }}
         >
           <label className="field">
-            <span>Name</span>
+            <span>Название</span>
             <input
               autoFocus
               value={titleDraft}
-              placeholder="Home, work, someday…"
+              placeholder="Дом, работа, когда-нибудь…"
               onChange={(event) => setTitleDraft(event.target.value)}
               onKeyDown={(event) => {
                 if (event.key === 'Enter') {
@@ -155,7 +155,7 @@ export function NotesScreen({
               }}
             />
           </label>
-          <button type="button" className="primary" onClick={() => void createNote()}>Add note</button>
+          <button type="button" className="primary" onClick={() => void createNote()}>Добавить</button>
         </EditorSheet>
       )}
 
@@ -203,9 +203,9 @@ function NoteSheet({
   const [title, setTitle] = useState(note.title);
 
   return (
-    <EditorSheet title="Edit note" onClose={onClose}>
+    <EditorSheet title="Заметка" onClose={onClose}>
       <label className="field">
-        <span>Name</span>
+        <span>Название</span>
         <input autoFocus value={title} onChange={(event) => setTitle(event.target.value)} />
       </label>
 
@@ -214,7 +214,7 @@ function NoteSheet({
         className="primary"
         onClick={() => void onRename(note, title).then(onClose)}
       >
-        Save changes
+        Сохранить
       </button>
 
       <button
@@ -222,7 +222,7 @@ function NoteSheet({
         className="danger-link"
         onClick={() => void onDelete(note.id).then(onClose)}
       >
-        Delete note
+        Удалить заметку
       </button>
     </EditorSheet>
   );
@@ -244,9 +244,9 @@ function EntrySheet({
   const [text, setText] = useState(entry.text);
 
   return (
-    <EditorSheet title="Entry" onClose={onClose}>
+    <EditorSheet title="Запись" onClose={onClose}>
       <label className="field">
-        <span>Text</span>
+        <span>Текст</span>
         <input autoFocus value={text} onChange={(event) => setText(event.target.value)} />
       </label>
 
@@ -255,13 +255,13 @@ function EntrySheet({
         className="primary"
         onClick={() => void onUpdate(entry, text).then(onClose)}
       >
-        Save changes
+        Сохранить
       </button>
 
       <div className="editor-divider" />
 
       <button type="button" className="utility-row" onClick={onAddToGoals}>
-        <span><strong>Add to goals</strong><small>Give it a start and an end date</small></span>
+        <span><strong>Сделать целью</strong><small>Указать даты начала и конца</small></span>
         <i>›</i>
       </button>
 
@@ -270,7 +270,7 @@ function EntrySheet({
         className="danger-link"
         onClick={() => void onDelete(entry.id).then(onClose)}
       >
-        Delete entry
+        Удалить запись
       </button>
     </EditorSheet>
   );
@@ -291,15 +291,15 @@ function GoalSheet({
   const invalid = endDate < startDate;
 
   return (
-    <EditorSheet title="Add to goals" onClose={onClose}>
+    <EditorSheet title="Сделать целью" onClose={onClose}>
       <div className="data-sheet-copy">
         <strong>{entry.text}</strong>
-        <span>This becomes an active goal. The entry stays on its note.</span>
+        <span>Появится активная цель. Запись останется в заметке.</span>
       </div>
 
       <div className="date-fields">
         <label className="field">
-          <span>Start</span>
+          <span>Начало</span>
           <input
             type="date"
             value={startDate}
@@ -307,7 +307,7 @@ function GoalSheet({
           />
         </label>
         <label className="field">
-          <span>End</span>
+          <span>Конец</span>
           <input
             type="date"
             value={endDate}
@@ -316,7 +316,7 @@ function GoalSheet({
         </label>
       </div>
 
-      {invalid && <div className="field-error">The end date is before the start date.</div>}
+      {invalid && <div className="field-error">Дата конца раньше даты начала.</div>}
 
       <button
         type="button"
@@ -324,7 +324,7 @@ function GoalSheet({
         disabled={invalid}
         onClick={() => void onConfirm(entry, startDate, endDate).then(onClose)}
       >
-        Create goal
+        Создать цель
       </button>
     </EditorSheet>
   );

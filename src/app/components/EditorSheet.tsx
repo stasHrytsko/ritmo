@@ -83,7 +83,7 @@ export function EditorSheet({
         <div className="sheet-handle" />
         <div className="sheet-header">
           <strong id={titleId}>{title}</strong>
-          <button type="button" aria-label="Close" onClick={() => close.current()}>×</button>
+          <button type="button" aria-label="Закрыть" onClick={() => close.current()}>×</button>
         </div>
         {children}
       </div>
