@@ -75,6 +75,28 @@ export const logicalDay = (now: Date, boundaryHour: number): Date => {
 export const logicalDayKey = (now: Date, boundaryHour: number): ISODate =>
   toISODate(logicalDay(now, boundaryHour));
 
+/** "HH:mm" as minutes since midnight. */
+export const toMinutes = (time: string) => {
+  const [hours, minutes] = time.split(':').map(Number);
+  return hours * 60 + minutes;
+};
+
+/**
+ * Minutes since the start of the logical day. Past midnight but before the
+ * boundary hour the day is not over yet, so 01:30 reads as 25:30 — later than
+ * a 23:00 routine rather than earlier.
+ */
+export const minutesIntoDay = (now: Date, boundaryHour: number) => {
+  const minutes = now.getHours() * 60 + now.getMinutes();
+  return now.getHours() < boundaryHour ? minutes + 24 * 60 : minutes;
+};
+
+/** A routine's "HH:mm" on the same scale: 00:45 is the end of a day, not its start. */
+export const routineMinutes = (time: string, boundaryHour: number) => {
+  const minutes = toMinutes(time);
+  return minutes < boundaryHour * 60 ? minutes + 24 * 60 : minutes;
+};
+
 const LOCALE = 'ru';
 
 const capitalize = (value: string) => value.charAt(0).toUpperCase() + value.slice(1);

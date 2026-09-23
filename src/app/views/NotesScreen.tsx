@@ -2,7 +2,9 @@ import { useState } from 'react';
 import type { NotesView } from '../../application/ritmoService';
 import type { Note, NoteEntry } from '../../domain/types';
 import { addDays, plural, toISODate } from '../../domain/time';
+import { Collapse } from '../components/Collapse';
 import { EditorSheet } from '../components/EditorSheet';
+import { Chevron, ChevronRight } from '../components/icons';
 import { Empty } from '../components/ui';
 
 type Sheet =
@@ -66,10 +68,7 @@ export function NotesScreen({
           const open = openNotes[note.id] ?? false;
 
           return (
-            <article
-              className={`note-card nested-accordion ${open ? 'expanded' : 'collapsed'}`}
-              key={note.id}
-            >
+            <article className="note-card nested-accordion" key={note.id}>
               <div className="note-card-head">
                 <button
                   type="button"
@@ -81,7 +80,7 @@ export function NotesScreen({
                     <strong>{note.title}</strong>
                     <small>{entries.length} {plural(entries.length, ['запись', 'записи', 'записей'])}</small>
                   </span>
-                  <span className={`accordion-chevron ${open ? 'open' : ''}`}>⌄</span>
+                  <Chevron />
                 </button>
                 <button
                   type="button"
@@ -93,7 +92,7 @@ export function NotesScreen({
                 </button>
               </div>
 
-              {open && (
+              <Collapse open={open}>
                 <div className="note-entries">
                   {entries.map((entry) => (
                     <button
@@ -103,7 +102,7 @@ export function NotesScreen({
                       onClick={() => setSheet({ kind: 'entry', entry })}
                     >
                       <span>{entry.text}</span>
-                      <i>›</i>
+                      <ChevronRight />
                     </button>
                   ))}
                   {entries.length === 0 && <Empty text="Пока ничего не записано." />}
@@ -128,7 +127,7 @@ export function NotesScreen({
                     </button>
                   </div>
                 </div>
-              )}
+              </Collapse>
             </article>
           );
         })}
@@ -262,7 +261,7 @@ function EntrySheet({
 
       <button type="button" className="utility-row" onClick={onAddToGoals}>
         <span><strong>Сделать целью</strong><small>Указать даты начала и конца</small></span>
-        <i>›</i>
+        <ChevronRight />
       </button>
 
       <button

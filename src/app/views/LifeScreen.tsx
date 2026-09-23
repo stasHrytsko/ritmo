@@ -1,8 +1,9 @@
 import { useRef, useState } from 'react';
 import type { LifeView } from '../../application/ritmoService';
 import type { Goal, GoalTask, Routine } from '../../domain/types';
-import { addDays, toISODate } from '../../domain/time';
+import { addDays, routineMinutes, toISODate } from '../../domain/time';
 import { EditorSheet } from '../components/EditorSheet';
+import { Check, ChevronRight } from '../components/icons';
 import { Empty } from '../components/ui';
 import { THEME_PREFERENCES, useThemePreference, type ThemePreference } from '../theme';
 
@@ -59,6 +60,7 @@ export function LifeScreen({
   installPrompt,
   onSaveRoutine,
   onDeleteRoutine,
+  onToggleActive,
   onSaveGoal,
   onDeleteGoal,
   onAddTask,
@@ -73,6 +75,7 @@ export function LifeScreen({
   installPrompt: BeforeInstallPromptEvent | null;
   onSaveRoutine: (draft: RoutineDraft, existing?: Routine) => Promise<void>;
   onDeleteRoutine: (id: string) => Promise<void>;
+  onToggleActive: (routine: Routine) => Promise<void>;
   onSaveGoal: (draft: GoalDraft, existing?: Goal) => Promise<void>;
   onDeleteGoal: (id: string) => Promise<void>;
   onAddTask: (goalId: string, title: string) => Promise<void>;
@@ -142,7 +145,6 @@ export function LifeScreen({
 
   return (
     <section className="screen life-screen">
-      <div className="eyebrow">Настройка</div>
       <h1>Жизнь</h1>
 
       <div className="segmented">
@@ -170,67 +172,83 @@ export function LifeScreen({
       </button>
 
       {tab === 'routines' && (
-        <div className="manage-list">
-          {data.routines.map((routine) => (
-            <button
-              type="button"
-              className="manage-row"
-              key={routine.id}
-              onClick={() => {
-                setRoutineDraft({
-                  id: routine.id,
-                  name: routine.name,
-                  weekdays: routine.weekdays,
-                  timing: routine.timing ?? 'anytime',
-                  time: routine.time ?? '07:30'
-                });
-                setEditorOpen(true);
-              }}
-            >
-              <span>
-                <strong>{routine.name}</strong>
-                <small>
-                  {formatSchedule(routine.weekdays)} · {routine.timing === 'exact' && routine.time ? routine.time : 'в любое время'}
-                </small>
-              </span>
-              <b>{routine.active ? 'Вкл' : 'Выкл'}</b>
-              <i>›</i>
-            </button>
+        <div className="life-groups">
+          {groupByTimeOfDay(data.routines, data.dayBoundaryHour).map(([label, routines]) => (
+            <section className="life-group" key={label} aria-label={label}>
+              <h2 className="life-group-label">{label}</h2>
+              <ul className="inset-list">
+                {routines.map((routine) => (
+                  <li className={`inset-row${routine.active ? '' : ' is-off'}`} key={routine.id}>
+                    <button
+                      type="button"
+                      className="inset-row-main"
+                      onClick={() => {
+                        setRoutineDraft({
+                          id: routine.id,
+                          name: routine.name,
+                          weekdays: routine.weekdays,
+                          timing: routine.timing ?? 'anytime',
+                          time: routine.time ?? '07:30'
+                        });
+                        setEditorOpen(true);
+                      }}
+                    >
+                      <strong>{routine.name}</strong>
+                      <small>
+                        {formatSchedule(routine.weekdays)}
+                        {routine.timing === 'exact' && routine.time ? ` · ${routine.time}` : ''}
+                      </small>
+                    </button>
+                    <button
+                      type="button"
+                      className="switch"
+                      role="switch"
+                      aria-checked={routine.active}
+                      aria-label={`${routine.name}: ${routine.active ? 'включена' : 'выключена'}`}
+                      onClick={() => void onToggleActive(routine)}
+                    />
+                  </li>
+                ))}
+              </ul>
+            </section>
           ))}
           {data.routines.length === 0 && <Empty text="Рутин пока нет." />}
         </div>
       )}
 
       {tab === 'goals' && (
-        <div className="manage-list">
-          {data.goals.map((goal) => {
-            const tasks = data.tasks.filter((task) => task.goalId === goal.id);
-            const done = tasks.filter((task) => task.status === 'done').length;
-            return (
-              <button
-                type="button"
-                className="manage-row goal-manage-row"
-                key={goal.id}
-                onClick={() => {
-                  setGoalDraft({
-                    id: goal.id,
-                    name: goal.name,
-                    startDate: goal.startDate,
-                    endDate: goal.endDate
-                  });
-                  setTaskDraft('');
-                  setEditorOpen(true);
-                }}
-              >
-                <span>
-                  <strong>{goal.name}</strong>
-                  <small>{goal.startDate} → {goal.endDate}</small>
-                </span>
-                <b>{done}/{tasks.length}</b>
-                <i>›</i>
-              </button>
-            );
-          })}
+        <div className="life-groups">
+          {data.goals.length > 0 && (
+            <ul className="inset-list">
+              {data.goals.map((goal) => {
+                const tasks = data.tasks.filter((task) => task.goalId === goal.id);
+                const done = tasks.filter((task) => task.status === 'done').length;
+                return (
+                  <li className="inset-row" key={goal.id}>
+                    <button
+                      type="button"
+                      className="inset-row-main"
+                      onClick={() => {
+                        setGoalDraft({
+                          id: goal.id,
+                          name: goal.name,
+                          startDate: goal.startDate,
+                          endDate: goal.endDate
+                        });
+                        setTaskDraft('');
+                        setEditorOpen(true);
+                      }}
+                    >
+                      <strong>{goal.name}</strong>
+                      <small>{formatGoalDates(goal.startDate, goal.endDate)}</small>
+                    </button>
+                    <span className="inset-row-meta">{done}/{tasks.length}</span>
+                    <ChevronRight />
+                  </li>
+                );
+              })}
+            </ul>
+          )}
           {data.goals.length === 0 && <Empty text="Целей пока нет." />}
         </div>
       )}
@@ -375,7 +393,7 @@ export function LifeScreen({
                         aria-pressed={task.status === 'done'}
                         onClick={() => void onToggleTask(task)}
                       >
-                        <span className="check-circle">{task.status === 'done' ? '✓' : ''}</span>
+                        <span className="check-circle"><Check /></span>
                         <span>{task.title}</span>
                       </button>
                     ))}
@@ -417,7 +435,7 @@ export function LifeScreen({
           {installPrompt && (
             <button type="button" className="utility-row" onClick={onInstall}>
               <span><strong>Установить Ritmo</strong><small>Иконка на главном экране</small></span>
-              <i>›</i>
+              <ChevronRight />
             </button>
           )}
           {isIOS() && !isStandalone() && (
@@ -483,6 +501,39 @@ function ThemePicker() {
       </div>
     </div>
   );
+}
+
+const GROUPS = ['Утро', 'День', 'Вечер', 'В любое время'] as const;
+
+/**
+ * Routines split by part of the day, in the day's own order. A routine past
+ * midnight belongs to the evening it ends, not the morning.
+ */
+function groupByTimeOfDay(routines: Routine[], boundaryHour: number) {
+  const groups = new Map<(typeof GROUPS)[number], Routine[]>(GROUPS.map((label) => [label, []]));
+  for (const routine of routines) {
+    if (routine.timing !== 'exact' || !routine.time) {
+      groups.get('В любое время')!.push(routine);
+      continue;
+    }
+    const minutes = routineMinutes(routine.time, boundaryHour);
+    const label = minutes < 12 * 60 ? 'Утро' : minutes < 18 * 60 ? 'День' : 'Вечер';
+    groups.get(label)!.push(routine);
+  }
+  return [...groups].filter(([, items]) => items.length > 0);
+}
+
+/** «1 окт — 31 дек», with the year only when it is not this one. */
+function formatGoalDates(start: string, end: string) {
+  const thisYear = new Date().getFullYear();
+  const format = (iso: string) => {
+    const date = new Date(`${iso}T00:00:00`);
+    const text = new Intl.DateTimeFormat('ru', { day: 'numeric', month: 'short' })
+      .format(date)
+      .replace('.', '');
+    return date.getFullYear() === thisYear ? text : `${text} ${date.getFullYear()}`;
+  };
+  return `${format(start)} — ${format(end)}`;
 }
 
 function formatSchedule(days: number[]) {

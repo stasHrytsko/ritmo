@@ -6,11 +6,14 @@ import {
   type Note,
   type NoteEntry,
   type Routine,
+  type RoutineCompletion,
   type RoutineSnapshot,
   type WeekRecord
 } from '../domain/types';
 import { getRoutineDayStates, hasDayMedal, type RoutineDayState } from '../domain/medal';
 import { planForDate, routinesInWeek, withPlanRevision } from '../domain/plan';
+import { routineStatus, type RoutineStatus } from '../domain/status';
+import { streaks, type Streak } from '../domain/streak';
 import {
   addDays,
   dayOfYear,
@@ -21,7 +24,9 @@ import {
   fromISODate,
   isoWeekday,
   logicalDay,
+  minutesIntoDay,
   monthName,
+  routineMinutes,
   toISODate,
   weekEnd,
   weekId,
@@ -44,6 +49,8 @@ export interface DayStrip {
   selected: boolean;
   /** Share of the day's scheduled routines done, 0..1. Zero for future days. */
   progress: number;
+  /** Lived with the app: false for days before tracking began. */
+  tracked: boolean;
 }
 
 export interface TodayView {
@@ -62,6 +69,9 @@ export interface TodayView {
   weeksLeft: number;
   /** Share of the current year already lived, 0..1. */
   yearProgress: number;
+  streak: Streak;
+  /** Needed on screen to read clock times against the logical day. */
+  dayBoundaryHour: number;
 }
 
 export interface WeekDayProgress {
@@ -69,6 +79,8 @@ export interface WeekDayProgress {
   scheduled: boolean;
   done: boolean;
   future: boolean;
+  /** Not scheduled that day, or where it stands if it was. */
+  status: RoutineStatus | 'off';
 }
 
 export interface WeekView {
@@ -87,14 +99,29 @@ export interface WeekView {
   goalDone: number;
   goalTotal: number;
   tasks: Array<{ task: GoalTask; goal?: Goal }>;
+  /** Needed to place a past-midnight routine at the end of the day. */
+  dayBoundaryHour: number;
+}
+
+export interface MonthDay {
+  date: Date;
+  medal: boolean;
+  /** Tracked and already lived, today included. */
+  known: boolean;
+  future: boolean;
+  isToday: boolean;
+  progress: number;
 }
 
 export interface MonthView {
   date: Date;
   name: string;
-  days: Array<{ date: Date; medal: boolean; known: boolean; progress: number }>;
+  days: MonthDay[];
   medalCount: number;
   knownDays: number;
+  /** Mean share done over the finished tracked days; null before there are any. */
+  averageProgress: number | null;
+  streak: Streak;
   goals: Array<{ goal: Goal; done: number; total: number }>;
 }
 
@@ -111,6 +138,8 @@ export interface LifeView {
   routines: Routine[];
   goals: Goal[];
   tasks: GoalTask[];
+  /** Needed to place a past-midnight routine at the end of the day. */
+  dayBoundaryHour: number;
 }
 
 export interface NoteWithEntries {
@@ -276,7 +305,13 @@ export class RitmoService {
       editable: dateKey <= todayKey,
       routines: states,
       medal: hasDayMedal(states),
-      week: this.buildDayStrip(week, weekCompletions, today, dateKey),
+      week: this.buildDayStrip(
+        week,
+        weekCompletions,
+        today,
+        await this.trackingStart(await this.repos.weeks.list()),
+        dateKey
+      ),
       goals: goals
         .map((goal) => ({
           goal,
@@ -287,8 +322,55 @@ export class RitmoService {
         .filter((item) => item.tasks.length > 0),
       daysLeft: daysLeftInYear(today),
       weeksLeft: weeksLeftInYear(today),
-      yearProgress: (dayOfYear(today) - 1) / daysInYear(today.getFullYear())
+      yearProgress: (dayOfYear(today) - 1) / daysInYear(today.getFullYear()),
+      streak: await this.getStreak(today),
+      dayBoundaryHour: this.boundaryHour
     };
+  }
+
+  /**
+   * Medal days in a row, and the best run so far. Walks every tracked day from
+   * install to today; a day with no week record was not tracked at all, so it
+   * breaks a run rather than being skipped over.
+   */
+  async getStreak(today = this.today()): Promise<Streak> {
+    const weeks = await this.repos.weeks.list();
+    const todayKey = toISODate(today);
+    const firstKey = await this.trackingStart(weeks);
+    if (!firstKey || firstKey > todayKey) return { current: 0, best: 0 };
+
+    const byWeek = new Map(weeks.map((week) => [week.id, week]));
+    const byDate = new Map<ISODate, RoutineCompletion[]>();
+    for (const completion of await this.repos.completions.listBetween(firstKey, todayKey)) {
+      const list = byDate.get(completion.date) ?? [];
+      list.push(completion);
+      byDate.set(completion.date, list);
+    }
+
+    const days: Array<{ key: ISODate; medal: boolean }> = [];
+    for (let day = fromISODate(firstKey); toISODate(day) <= todayKey; day = addDays(day, 1)) {
+      const key = toISODate(day);
+      const week = byWeek.get(weekId(day));
+      const medal = week
+        ? hasDayMedal(getRoutineDayStates(planForDate(week, key), byDate.get(key) ?? [], day))
+        : false;
+      days.push({ key, medal });
+    }
+
+    return streaks(days, todayKey);
+  }
+
+  /**
+   * The first day anything was tracked. A week record covers the whole week it
+   * was opened in, but days of that week before the install were never lived
+   * with the app, so they are not "zero" — they are not tracked at all.
+   */
+  private async trackingStart(weeks: WeekRecord[]): Promise<ISODate | undefined> {
+    if (weeks.length === 0) return undefined;
+    const firstWeek = weeks.reduce((first, week) => (week.startDate < first ? week.startDate : first), weeks[0].startDate);
+    const settings = await this.repos.settings.get();
+    const installed = settings ? toISODate(new Date(settings.installedAt)) : firstWeek;
+    return installed > firstWeek ? installed : firstWeek;
   }
 
   async toggleRoutine(date: Date, routineId: string) {
@@ -375,14 +457,17 @@ export class RitmoService {
     week: WeekRecord,
     completions: Awaited<ReturnType<Repositories['completions']['list']>>,
     today: Date,
+    trackedFrom: ISODate | undefined,
     selectedKey = toISODate(today)
   ): DayStrip[] {
     const todayKey = toISODate(today);
     return Array.from({ length: 7 }, (_, index) => {
       const day = addDays(fromISODate(week.startDate), index);
       const key = toISODate(day);
-      // A day that has not happened yet cannot have earned anything.
+      // A day that has not happened yet cannot have earned anything, and a day
+      // before the app was installed was never lived with it.
       const future = key > todayKey;
+      const tracked = !future && trackedFrom !== undefined && key >= trackedFrom;
       const states = getRoutineDayStates(
         planForDate(week, key),
         completions.filter((item) => item.date === key),
@@ -390,11 +475,12 @@ export class RitmoService {
       );
       return {
         date: day,
-        medal: !future && hasDayMedal(states),
+        medal: tracked && hasDayMedal(states),
         isToday: key === todayKey,
         future,
         selected: key === selectedKey,
-        progress: future ? 0 : dayProgress(states)
+        progress: tracked ? dayProgress(states) : 0,
+        tracked
       };
     });
   }
@@ -524,23 +610,38 @@ export class RitmoService {
     const goals = (await this.repos.goals.list()).filter((goal) => goal.status !== 'paused');
     const goalMap = new Map(goals.map((goal) => [goal.id, goal]));
     const todayKey = toISODate(today);
+    const nowMinutes = minutesIntoDay(at, this.boundaryHour);
+    const trackedFrom = await this.trackingStart(await this.repos.weeks.list());
 
     const routineProgress = [...routinesInWeek(week)]
       .filter((routine) => routine.active)
-      .sort(byTimeOfDay)
+      .sort(byTimeOfDay(this.boundaryHour))
       .map((routine) => {
-        const days = Array.from({ length: 7 }, (_, index) => {
+        const days = Array.from({ length: 7 }, (_, index): WeekDayProgress => {
           const day = addDays(fromISODate(week.startDate), index);
           const key = toISODate(day);
           // A routine only counts on days whose plan revision actually had it.
           const planned = planForDate(week, key)
             .find((item) => item.routineId === routine.routineId);
-          const scheduled = Boolean(planned?.active)
+          // Before tracking began nothing was owed, whatever the plan said.
+          const lived = trackedFrom !== undefined && key >= trackedFrom;
+          const scheduled = (key > todayKey || lived)
+            && Boolean(planned?.active)
             && Boolean(planned?.weekdays.includes(isoWeekday(day)));
           const done = completions.some(
             (item) => item.date === key && item.routineId === routine.routineId && item.done
           );
-          return { date: day, scheduled, done, future: key > todayKey };
+          const status = scheduled
+            ? routineStatus({
+                done,
+                time: routine.timing === 'exact' ? routine.time : undefined,
+                dayKey: key,
+                todayKey,
+                nowMinutes,
+                boundaryHour: this.boundaryHour
+              })
+            : 'off';
+          return { date: day, scheduled, done, future: key > todayKey, status };
         });
         // Days still ahead are not owed yet, so they do not count against the week.
         const scheduledDays = days.filter((item) => item.scheduled && !item.future);
@@ -567,14 +668,15 @@ export class RitmoService {
     return {
       week,
       label: formatRange(fromISODate(week.startDate), fromISODate(week.endDate)),
-      days: this.buildDayStrip(week, completions, today),
+      days: this.buildDayStrip(week, completions, today, trackedFrom),
       routineProgress,
       goalProgress,
       routineDone: routineProgress.reduce((sum, item) => sum + item.done, 0),
       routineTotal: routineProgress.reduce((sum, item) => sum + item.total, 0),
       goalDone: goalProgress.reduce((sum, item) => sum + item.done, 0),
       goalTotal: goalProgress.reduce((sum, item) => sum + item.total, 0),
-      tasks: tasks.map((task) => ({ task, goal: goalMap.get(task.goalId) }))
+      tasks: tasks.map((task) => ({ task, goal: goalMap.get(task.goalId) })),
+      dayBoundaryHour: this.boundaryHour
     };
   }
 
@@ -586,29 +688,33 @@ export class RitmoService {
     const firstKey = toISODate(new Date(year, month, 1));
     const lastKey = toISODate(new Date(year, month, daysInMonth(year, month)));
 
-    const weeks = (await this.repos.weeks.list()).filter(
-      (week) => week.startDate <= lastKey && week.endDate >= firstKey
-    );
+    const allWeeks = await this.repos.weeks.list();
+    const trackedFrom = await this.trackingStart(allWeeks);
+    const weeks = allWeeks.filter((week) => week.startDate <= lastKey && week.endDate >= firstKey);
     // Bounded by the month via the date index rather than scanning everything.
     const completions = await this.repos.completions.listBetween(firstKey, lastKey);
     const todayKey = toISODate(today);
 
-    const days = Array.from({ length: daysInMonth(year, month) }, (_, index) => {
+    const days = Array.from({ length: daysInMonth(year, month) }, (_, index): MonthDay => {
       const day = new Date(year, month, index + 1);
       const key = toISODate(day);
       const week = weeks.find((item) => key >= item.startDate && key <= item.endDate);
-      if (!week || key > todayKey) return { date: day, medal: false, known: false, progress: 0 };
+      const base = { date: day, future: key > todayKey, isToday: key === todayKey };
+      const tracked = week && trackedFrom !== undefined && key >= trackedFrom;
+      if (!tracked || key > todayKey) return { ...base, medal: false, known: false, progress: 0 };
 
       const states = getRoutineDayStates(
         planForDate(week, key),
         completions.filter((item) => item.date === key),
         day
       );
-      return { date: day, medal: hasDayMedal(states), known: true, progress: dayProgress(states) };
+      return { ...base, medal: hasDayMedal(states), known: true, progress: dayProgress(states) };
     });
 
     const goals = await this.repos.goals.list();
     const tasks = await this.repos.goalTasks.list();
+    // Today is still in progress, so it would only drag the average down.
+    const finished = days.filter((day) => day.known && !day.isToday);
 
     return {
       date,
@@ -616,6 +722,10 @@ export class RitmoService {
       days,
       medalCount: days.filter((day) => day.medal).length,
       knownDays: days.filter((day) => day.known).length,
+      averageProgress: finished.length
+        ? finished.reduce((sum, day) => sum + day.progress, 0) / finished.length
+        : null,
+      streak: await this.getStreak(today),
       goals: goals.map((goal) => {
         const goalTasks = tasks.filter((task) => task.goalId === goal.id);
         return {
@@ -682,7 +792,12 @@ export class RitmoService {
       this.repos.goals.list(),
       this.repos.goalTasks.list()
     ]);
-    return { routines: [...routines].sort(byTimeOfDay), goals, tasks };
+    return {
+      routines: [...routines].sort(byTimeOfDay(this.boundaryHour)),
+      goals,
+      tasks,
+      dayBoundaryHour: this.boundaryHour
+    };
   }
 
   exportBackup() {
@@ -704,13 +819,15 @@ export function dayProgress(states: RoutineDayState[]) {
   return scheduled.filter((state) => state.done).length / scheduled.length;
 }
 
-/** Timed routines by clock time, anytime ones after them, then by name. */
-function byTimeOfDay(
-  a: { timing?: Routine['timing']; time?: string; name: string },
-  b: { timing?: Routine['timing']; time?: string; name: string }
-) {
-  const keyOf = (item: typeof a) => (item.timing === 'exact' && item.time ? item.time : '99:99');
-  return keyOf(a).localeCompare(keyOf(b)) || a.name.localeCompare(b.name, 'ru');
+/**
+ * Timed routines by their place in the day, anytime ones after them, then by
+ * name. A 00:30 routine comes after 23:00 when the day runs past midnight.
+ */
+function byTimeOfDay(boundaryHour: number) {
+  type Sortable = { timing?: Routine['timing']; time?: string; name: string };
+  const keyOf = (item: Sortable) =>
+    item.timing === 'exact' && item.time ? routineMinutes(item.time, boundaryHour) : Number.POSITIVE_INFINITY;
+  return (a: Sortable, b: Sortable) => keyOf(a) - keyOf(b) || a.name.localeCompare(b.name, 'ru');
 }
 
 function sortWeekdays(weekdays: number[]) {

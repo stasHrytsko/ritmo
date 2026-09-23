@@ -14,6 +14,10 @@ It separates two kinds of progress:
 - Today view with days/weeks left in the year
 - Routine completion, including earlier days of the current week (tap a day in the week strip)
 - Partial daily progress: rings in the week strip, fill in the month calendar
+- Today's timeline reads each routine as missed, due now, next or ahead; up to an hour late still counts as now
+- Swipe between the days of the current week
+- Streak of medal days, with the best run, in Today and the month
+- Removals can be undone for five seconds; nothing is written until the offer runs out
 - Automatic satisfaction for routines not scheduled that day
 - Daily medal when every routine requirement for the day is satisfied
 - Weekly sprint overview

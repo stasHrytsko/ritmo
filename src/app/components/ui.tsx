@@ -1,3 +1,5 @@
+import { Chevron } from './icons';
+
 export function Empty({ text }: { text: string }) {
   return <div className="empty">{text}</div>;
 }
@@ -27,7 +29,7 @@ export function AccordionHeader({
       <h2>{title}</h2>
       <span className="accordion-header-right">
         <b>{meta}</b>
-        <i className={`accordion-chevron ${open ? 'open' : ''}`}>⌄</i>
+        <Chevron />
       </span>
     </button>
   );

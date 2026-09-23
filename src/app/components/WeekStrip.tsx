@@ -1,5 +1,6 @@
 import type { DayStrip } from '../../application/ritmoService';
 import { WEEKDAY_LETTERS, weekdayName } from '../../domain/time';
+import { Check } from './icons';
 
 const RADIUS = 16;
 const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
@@ -33,7 +34,8 @@ export function WeekStrip({ days, onSelect }: { days: DayStrip[]; onSelect?: (da
             <b>
               <svg viewBox="0 0 36 36" aria-hidden="true">
                 <circle className="ring-track" cx="18" cy="18" r={RADIUS} />
-                {!day.future && day.progress > 0 && (
+                {/* Always present, so going from nothing to the first tick animates too. */}
+                {!day.future && (
                   <circle
                     className="ring-fill"
                     cx="18"
@@ -41,12 +43,13 @@ export function WeekStrip({ days, onSelect }: { days: DayStrip[]; onSelect?: (da
                     r={RADIUS}
                     strokeDasharray={CIRCUMFERENCE}
                     strokeDashoffset={CIRCUMFERENCE * (1 - day.progress)}
+                    data-empty={day.progress === 0 ? 'true' : undefined}
                   />
                 )}
               </svg>
               <em>{day.date.getDate()}</em>
             </b>
-            <i>{day.medal ? '✓' : ''}</i>
+            <i>{day.medal && <Check />}</i>
           </button>
         );
       })}

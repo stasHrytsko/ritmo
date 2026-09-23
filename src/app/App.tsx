@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { GoalTask, ISODate } from '../domain/types';
-import { logicalDayKey, toISODate } from '../domain/time';
+import { logicalDayKey, plural, toISODate } from '../domain/time';
 import { describeBackup, parseBackup } from '../domain/backup';
 import { hasDayMedal } from '../domain/medal';
 import { repositories } from '../infrastructure/repositories';
@@ -15,6 +15,8 @@ import {
   dayProgress
 } from '../application/ritmoService';
 import { NavButton } from './components/BottomNav';
+import { StreakMark } from './components/icons';
+import { UndoToast } from './components/UndoToast';
 import type { PeriodView } from './components/ui';
 import { TodayScreen } from './views/TodayScreen';
 import { ProgressScreen } from './views/ProgressScreen';
@@ -40,6 +42,21 @@ const isProgress = (view: View): view is PeriodView =>
 
 const TOPBAR_LABELS: Partial<Record<View, string>> = { day: 'Сегодня', notes: 'Заметки' };
 
+/** How long a removal can be taken back before it is written. */
+const UNDO_MS = 5000;
+
+/**
+ * A removal the user can still take back. Nothing is deleted until the offer
+ * runs out: the item is only hidden, so undoing needs no restore at all, and
+ * a history that vanished by mistake is simply still there.
+ */
+interface PendingDelete {
+  key: string;
+  label: string;
+  ids: ReadonlySet<string>;
+  commit: () => Promise<void>;
+}
+
 export function App() {
   const service = useMemo(() => new RitmoService(repositories), []);
   const [view, setView] = useState<View>('day');
@@ -48,6 +65,11 @@ export function App() {
   const [error, setError] = useState<string | null>(null);
   const [dataMenuOpen, setDataMenuOpen] = useState(false);
   const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(null);
+  const pendingDeleteRef = useRef<PendingDelete | null>(null);
+  const undoTimer = useRef<number | undefined>(undefined);
+  const viewRef = useRef(view);
+  viewRef.current = view;
   // Which day Today shows. Undefined means the current day, whatever it is.
   const [selectedDay, setSelectedDay] = useState<ISODate | undefined>();
   const selectedDayRef = useRef(selectedDay);
@@ -129,8 +151,52 @@ export function App() {
     return () => window.removeEventListener('beforeinstallprompt', handler);
   }, []);
 
+  /** Writes the pending removal now, if there is one. */
+  const flushDelete = useCallback(async () => {
+    const pendingNow = pendingDeleteRef.current;
+    if (!pendingNow) return;
+    window.clearTimeout(undoTimer.current);
+    pendingDeleteRef.current = null;
+    setPendingDelete(null);
+    try {
+      await pendingNow.commit();
+    } catch (cause) {
+      setError(describeError(cause));
+    }
+    await refresh(viewRef.current);
+  }, [refresh]);
+
+  const scheduleDelete = useCallback(async (label: string, ids: string[], commit: () => Promise<void>) => {
+    // One offer at a time: a second removal settles the first.
+    await flushDelete();
+    const next: PendingDelete = { key: crypto.randomUUID(), label, ids: new Set(ids), commit };
+    pendingDeleteRef.current = next;
+    setPendingDelete(next);
+    undoTimer.current = window.setTimeout(() => void flushDelete(), UNDO_MS);
+  }, [flushDelete]);
+
+  const undoDelete = () => {
+    window.clearTimeout(undoTimer.current);
+    pendingDeleteRef.current = null;
+    setPendingDelete(null);
+  };
+
+  // Leaving the app settles a pending removal instead of silently dropping it.
+  useEffect(() => {
+    const settle = () => {
+      if (document.visibilityState === 'hidden') void flushDelete();
+    };
+    document.addEventListener('visibilitychange', settle);
+    window.addEventListener('pagehide', settle);
+    return () => {
+      document.removeEventListener('visibilitychange', settle);
+      window.removeEventListener('pagehide', settle);
+    };
+  }, [flushDelete]);
+
   const navigate = (target: View) => {
     if (target === view) return;
+    void flushDelete();
     // Leaving Today always brings you back to the current day next time.
     if (target !== 'day') {
       setSelectedDay(undefined);
@@ -222,6 +288,8 @@ export function App() {
     if (result.outcome === 'accepted') setInstallPrompt(null);
   };
 
+  const shown = screen && pendingDelete ? withoutIds(screen, pendingDelete.ids) : screen;
+
   return (
     <div className="app-shell">
       <header className="topbar">
@@ -236,7 +304,7 @@ export function App() {
             ⋯
           </button>
         ) : (
-          <div className="topbar-mark">{screen?.view === 'day' && !screen.data.isToday ? 'День' : TOPBAR_LABELS[view] ?? 'Прогресс'}</div>
+          <TopbarMark view={view} screen={screen} />
         )}
       </header>
 
@@ -257,9 +325,9 @@ export function App() {
           </div>
         )}
 
-        {screen?.view === 'day' && (
+        {shown?.view === 'day' && (
           <TodayScreen
-            data={screen.data}
+            data={shown.data}
             onToggleRoutine={toggleRoutine}
             onToggleTask={toggleTask}
             onSelectDay={selectDay}
@@ -276,9 +344,9 @@ export function App() {
           <ProgressScreen screen={{ view: 'year', data: screen.data }} onChange={navigate} />
         )}
 
-        {screen?.view === 'notes' && (
+        {shown?.view === 'notes' && (
           <NotesScreen
-            data={screen.data}
+            data={shown.data}
             onCreateNote={async (title) => {
               await service.createNote(title);
               await refresh('notes');
@@ -288,8 +356,14 @@ export function App() {
               await refresh('notes');
             }}
             onDeleteNote={async (noteId) => {
-              await service.deleteNote(noteId);
-              await refresh('notes');
+              const note = screen?.view === 'notes'
+                ? screen.data.notes.find((item) => item.note.id === noteId)
+                : undefined;
+              await scheduleDelete(
+                note ? `Заметка «${note.note.title}» удалена` : 'Заметка удалена',
+                [noteId, ...(note?.entries.map((entry) => entry.id) ?? [])],
+                () => service.deleteNote(noteId)
+              );
             }}
             onAddEntry={async (noteId, text) => {
               await service.addNoteEntry(noteId, text);
@@ -300,8 +374,7 @@ export function App() {
               await refresh('notes');
             }}
             onDeleteEntry={async (entryId) => {
-              await service.deleteNoteEntry(entryId);
-              await refresh('notes');
+              await scheduleDelete('Запись удалена', [entryId], () => service.deleteNoteEntry(entryId));
             }}
             onAddEntryToGoals={async (entry, startDate, endDate) => {
               await service.addEntryToGoals(entry, startDate, endDate);
@@ -310,9 +383,9 @@ export function App() {
           />
         )}
 
-        {screen?.view === 'life' && (
+        {shown?.view === 'life' && (
           <LifeScreen
-            data={screen.data}
+            data={shown.data}
             dataMenuOpen={dataMenuOpen}
             installPrompt={installPrompt}
             onSaveRoutine={async (draft, existing) => {
@@ -335,7 +408,17 @@ export function App() {
               await refresh('life');
             }}
             onDeleteRoutine={async (id) => {
-              await service.deleteRoutine(id);
+              const routine = screen?.view === 'life'
+                ? screen.data.routines.find((item) => item.id === id)
+                : undefined;
+              await scheduleDelete(
+                routine ? `Рутина «${routine.name}» удалена` : 'Рутина удалена',
+                [id],
+                () => service.deleteRoutine(id)
+              );
+            }}
+            onToggleActive={async (routine) => {
+              await service.updateRoutine({ ...routine, active: !routine.active });
               await refresh('life');
             }}
             onSaveGoal={async (draft, existing) => {
@@ -352,8 +435,14 @@ export function App() {
               await refresh('life');
             }}
             onDeleteGoal={async (id) => {
-              await service.deleteGoal(id);
-              await refresh('life');
+              const goal = screen?.view === 'life'
+                ? screen.data.goals.find((item) => item.id === id)
+                : undefined;
+              await scheduleDelete(
+                goal ? `Цель «${goal.name}» удалена` : 'Цель удалена',
+                [id],
+                () => service.deleteGoal(id)
+              );
             }}
             onAddTask={async (goalId, title) => {
               await service.addGoalTask(goalId, title);
@@ -367,6 +456,15 @@ export function App() {
           />
         )}
       </main>
+
+      {pendingDelete && (
+        <UndoToast
+          key={pendingDelete.key}
+          label={pendingDelete.label}
+          durationMs={UNDO_MS}
+          onUndo={undoDelete}
+        />
+      )}
 
       <footer className="bottom-nav">
         <NavButton label="Сегодня" icon="today" active={view === 'day'} onClick={() => navigate('day')} />
@@ -397,10 +495,15 @@ function withToggledRoutine(data: TodayView, routineId: string): TodayView {
   });
   const medal = hasDayMedal(routines);
   const dateKey = toISODate(data.date);
+  // Closing or reopening today moves the run by one; the quiet reload that
+  // follows confirms it from storage.
+  const shift = data.isToday && medal !== data.medal ? (medal ? 1 : -1) : 0;
+  const current = Math.max(0, data.streak.current + shift);
   return {
     ...data,
     routines,
     medal,
+    streak: { current, best: Math.max(data.streak.best, current) },
     week: data.week.map((day) =>
       toISODate(day.date) === dateKey ? { ...day, medal, progress: dayProgress(routines) } : day
     )
@@ -417,4 +520,59 @@ function withToggledTask(data: TodayView, taskId: string): TodayView {
       )
     }))
   };
+}
+
+/** A screen with the items of a pending removal left out. */
+function withoutIds(screen: Screen, ids: ReadonlySet<string>): Screen {
+  if (screen.view === 'life') {
+    return {
+      view: 'life',
+      data: {
+        ...screen.data,
+        routines: screen.data.routines.filter((routine) => !ids.has(routine.id)),
+        goals: screen.data.goals.filter((goal) => !ids.has(goal.id)),
+        tasks: screen.data.tasks.filter((task) => !ids.has(task.goalId))
+      }
+    };
+  }
+  if (screen.view === 'notes') {
+    return {
+      view: 'notes',
+      data: {
+        notes: screen.data.notes
+          .filter((item) => !ids.has(item.note.id))
+          .map((item) => ({ ...item, entries: item.entries.filter((entry) => !ids.has(entry.id)) }))
+      }
+    };
+  }
+  if (screen.view === 'day') {
+    return {
+      view: 'day',
+      data: {
+        ...screen.data,
+        routines: screen.data.routines.filter((state) => !ids.has(state.routine.routineId))
+      }
+    };
+  }
+  return screen;
+}
+
+/**
+ * The right-hand side of the top bar: the running streak on Today, a plain
+ * label elsewhere.
+ */
+function TopbarMark({ view, screen }: { view: View; screen: Screen | null }) {
+  if (screen?.view === 'day') {
+    if (!screen.data.isToday) return <div className="topbar-mark">День</div>;
+    const { current } = screen.data.streak;
+    if (current > 0) {
+      return (
+        <div className="streak-chip" aria-label={`Серия: ${current} ${plural(current, ['день', 'дня', 'дней'])} подряд`}>
+          <StreakMark />
+          <span>{current} {plural(current, ['день', 'дня', 'дней'])} подряд</span>
+        </div>
+      );
+    }
+  }
+  return <div className="topbar-mark">{TOPBAR_LABELS[view] ?? 'Прогресс'}</div>;
 }

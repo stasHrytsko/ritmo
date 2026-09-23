@@ -119,6 +119,7 @@ describe('medals', () => {
   });
 
   it('survives a routine added later the same week', async () => {
+    store.settings = { ...store.settings!, installedAt: new Date('2026-09-14T09:00:00+02:00').toISOString() };
     // Monday: one routine exists and gets done, earning the day its medal.
     vi.setSystemTime(new Date('2026-09-14T09:00:00+02:00'));
     const walk = await addRoutine('Walk');
@@ -438,11 +439,167 @@ describe('other days of the week', () => {
 
 describe('week totals', () => {
   it('count only the days already lived', async () => {
+    store.settings = { ...store.settings!, installedAt: new Date('2026-09-14T09:00:00+02:00').toISOString() };
     vi.setSystemTime(new Date('2026-09-14T10:00:00+02:00'));
     await addRoutine('Walk');
     vi.setSystemTime(NOW);
 
     const week = await service.getWeek();
     expect(week.routineTotal).toBe(5);
+  });
+});
+
+describe('streak', () => {
+  const installOn = (iso: string) => {
+    store.settings = { ...store.settings!, installedAt: new Date(iso).toISOString() };
+  };
+
+  const fromMonday = async () => {
+    installOn('2026-09-14T09:00:00+02:00');
+    vi.setSystemTime(new Date('2026-09-14T10:00:00+02:00'));
+    const walk = await addRoutine('Walk');
+    vi.setSystemTime(NOW);
+    return walk;
+  };
+
+  const tick = (routineId: string, day: number) =>
+    service.toggleRoutine(new Date(2026, 8, day), routineId);
+
+  it('counts medal days up to yesterday while today is still open', async () => {
+    const walk = await fromMonday();
+    for (const day of [14, 15, 16, 17]) await tick(walk.id, day);
+
+    const { streak } = await service.getToday();
+    expect(streak).toEqual({ current: 4, best: 4 });
+  });
+
+  it('grows when today closes', async () => {
+    const walk = await fromMonday();
+    for (const day of [14, 15, 16, 17, 18]) await tick(walk.id, day);
+    expect((await service.getToday()).streak.current).toBe(5);
+  });
+
+  it('breaks on a missed day and keeps the best run', async () => {
+    const walk = await fromMonday();
+    for (const day of [14, 15, 17]) await tick(walk.id, day);
+
+    expect((await service.getToday()).streak).toEqual({ current: 1, best: 2 });
+  });
+
+  it('does not count days before the app was installed', async () => {
+    const walk = await fromMonday();
+    installOn('2026-09-17T09:00:00+02:00');
+    await tick(walk.id, 17);
+    expect((await service.getToday()).streak).toEqual({ current: 1, best: 1 });
+  });
+
+  it('is shown in the month too', async () => {
+    const walk = await fromMonday();
+    for (const day of [14, 15, 16, 17]) await tick(walk.id, day);
+    expect((await service.getMonth()).streak.current).toBe(4);
+  });
+});
+
+describe('week cells', () => {
+  it('reads each cell as off, done, missed, due or ahead', async () => {
+    // Friday 10:00. Timed routines at 08:00 (two hours late), 09:30 (just late) and 11:00.
+    await service.createRoutine('Early', [1, 2, 3, 4, 5, 6, 7], 'exact', '08:00');
+    await service.createRoutine('Recent', [1, 2, 3, 4, 5, 6, 7], 'exact', '09:30');
+    await service.createRoutine('Later', [1, 2, 3, 4, 5, 6, 7], 'exact', '11:00');
+    await service.createRoutine('Done', [1, 2, 3, 4, 5, 6, 7], 'exact', '07:00');
+    const done = store.routines.find((routine) => routine.name === 'Done')!;
+    await service.toggleRoutine(service.today(), done.id);
+
+    const week = await service.getWeek();
+    const statusOf = (name: string, index: number) =>
+      week.routineProgress.find((item) => item.routine.name === name)!.days[index].status;
+
+    // Created on Friday, so Monday's plan never had them.
+    expect(statusOf('Early', 0)).toBe('off');
+    expect(statusOf('Early', 4)).toBe('missed');
+    expect(statusOf('Recent', 4)).toBe('due');
+    expect(statusOf('Later', 4)).toBe('ahead');
+    expect(statusOf('Done', 4)).toBe('done');
+    expect(statusOf('Early', 5)).toBe('ahead');
+  });
+
+  it('lists routines in the order of the day', async () => {
+    await service.createRoutine('Evening', [1, 2, 3, 4, 5, 6, 7], 'exact', '21:00');
+    await service.createRoutine('Anytime', [1, 2, 3, 4, 5, 6, 7], 'anytime');
+    await service.createRoutine('Morning', [1, 2, 3, 4, 5, 6, 7], 'exact', '07:00');
+
+    const names = (await service.getWeek()).routineProgress.map((item) => item.routine.name);
+    expect(names).toEqual(['Morning', 'Evening', 'Anytime']);
+  });
+});
+
+describe('month days', () => {
+  it('tells future days from untracked ones and marks today', async () => {
+    const month = await service.getMonth();
+    const day = (n: number) => month.days[n - 1];
+
+    expect(day(1).known).toBe(false);
+    expect(day(1).future).toBe(false);
+    expect(day(18).isToday).toBe(true);
+    expect(day(18).known).toBe(true);
+    expect(day(25).future).toBe(true);
+    expect(day(25).known).toBe(false);
+  });
+
+  it('averages finished days only, leaving today out', async () => {
+    store.settings = { ...store.settings!, installedAt: new Date('2026-09-14T09:00:00+02:00').toISOString() };
+    vi.setSystemTime(new Date('2026-09-14T10:00:00+02:00'));
+    const walk = await addRoutine('Walk');
+    await addRoutine('Gym');
+    vi.setSystemTime(NOW);
+    // Monday fully done, Tuesday half, Wednesday and Thursday nothing, Friday (today) full.
+    const gym = store.routines.find((routine) => routine.name === 'Gym')!;
+    await service.toggleRoutine(new Date(2026, 8, 14), walk.id);
+    await service.toggleRoutine(new Date(2026, 8, 14), gym.id);
+    await service.toggleRoutine(new Date(2026, 8, 15), walk.id);
+    await service.toggleRoutine(new Date(2026, 8, 18), walk.id);
+    await service.toggleRoutine(new Date(2026, 8, 18), gym.id);
+
+    const month = await service.getMonth();
+    expect(month.averageProgress).toBeCloseTo((1 + .5 + 0 + 0) / 4);
+  });
+
+  it('has no average before any day has finished', async () => {
+    expect((await service.getMonth()).averageProgress).toBeNull();
+  });
+
+  it('treats days of the install week before the install as untracked, not zero', async () => {
+    // Installed on Friday 18; the week record still starts on Monday 14.
+    const month = await service.getMonth();
+    expect(month.days[13].known).toBe(false);
+    expect(month.days[16].known).toBe(false);
+    expect(month.days[17].known).toBe(true);
+  });
+});
+
+describe('the install week', () => {
+  it('does not hold days before the install against you', async () => {
+    // Installed Friday; the week record still starts on Monday.
+    vi.setSystemTime(new Date('2026-09-14T10:00:00+02:00'));
+    await addRoutine('Walk');
+    vi.setSystemTime(NOW);
+
+    const week = await service.getWeek();
+    const walk = week.routineProgress.find((item) => item.routine.name === 'Walk')!;
+
+    expect(walk.days[0].status).toBe('off');
+    expect(walk.days[3].status).toBe('off');
+    expect(walk.days[4].status).not.toBe('off');
+    expect(week.routineTotal).toBe(1);
+    expect(week.days.filter((day) => day.tracked).map((day) => toISODate(day.date))).toEqual(['2026-09-18']);
+  });
+
+  it('gives no medal to a day before the install', async () => {
+    vi.setSystemTime(new Date('2026-09-14T10:00:00+02:00'));
+    const walk = await addRoutine('Walk');
+    await service.toggleRoutine(service.today(), walk.id);
+    vi.setSystemTime(NOW);
+
+    expect((await service.getToday()).week[0].medal).toBe(false);
   });
 });
