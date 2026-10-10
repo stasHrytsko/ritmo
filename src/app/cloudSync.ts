@@ -26,6 +26,7 @@ interface Options {
  */
 export function useCloudSync({ exportBackup, importBackup, onPulled }: Options) {
   const [session, setSession] = useState<Session | null>(null);
+  const [ready, setReady] = useState(!cloudConfigured);
   const [status, setStatus] = useState<SyncStatus>(cloudConfigured ? 'idle' : 'off');
   const [message, setMessage] = useState<string | null>(null);
   const running = useRef(false);
@@ -33,7 +34,7 @@ export function useCloudSync({ exportBackup, importBackup, onPulled }: Options) 
 
   useEffect(() => {
     if (!cloudConfigured) return;
-    void getSession().then(setSession);
+    void getSession().then(setSession).finally(() => setReady(true));
     return onAuthChange(setSession);
   }, []);
 
@@ -103,5 +104,5 @@ export function useCloudSync({ exportBackup, importBackup, onPulled }: Options) 
     return () => document.removeEventListener('visibilitychange', onHide);
   }, [userId, sync]);
 
-  return { session, status, message, sync: () => sync() };
+  return { session, ready, status, message, sync: () => sync() };
 }

@@ -11,24 +11,13 @@ const STATUS_LABELS: Record<SyncStatus, string> = {
   error: 'Не удалось синхронизировать'
 };
 
-export function CloudPanel({
-  session,
-  status,
-  message,
-  onSync
-}: {
-  session: Session | null;
-  status: SyncStatus;
-  message: string | null;
-  onSync: () => void;
-}) {
+/** Email + one-time code. The same flow signs in and registers. */
+export function AuthForm({ intro, className = 'cloud-panel' }: { intro?: string; className?: string }) {
   const [email, setEmail] = useState('');
   const [code, setCode] = useState('');
   const [sent, setSent] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  if (!cloudConfigured) return null;
 
   const run = async (action: () => Promise<void>) => {
     setBusy(true);
@@ -42,25 +31,9 @@ export function CloudPanel({
     }
   };
 
-  if (session) {
-    return (
-      <div className="cloud-panel">
-        <div className="data-sheet-copy">
-          <strong>Облако</strong>
-          <span>{session.user.email}</span>
-          <span>{STATUS_LABELS[status]}{message ? `: ${message}` : ''}</span>
-        </div>
-        <div className="backup-actions">
-          <button type="button" disabled={status === 'syncing'} onClick={onSync}>Синхронизировать</button>
-          <button type="button" onClick={() => void run(signOut)}>Выйти</button>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <form
-      className="cloud-panel"
+      className={className}
       onSubmit={(event) => {
         event.preventDefault();
         void run(async () => {
@@ -80,7 +53,7 @@ export function CloudPanel({
         <span>
           {sent
             ? `Мы отправили код на ${email}. Введите его — или откройте ссылку из письма.`
-            : 'Войдите по email, чтобы хранить данные в облаке и открывать их на любом устройстве. Новый аккаунт создастся сам.'}
+            : intro ?? 'Войдите по email, чтобы хранить данные в облаке и открывать их на любом устройстве. Новый аккаунт создастся сам.'}
         </span>
       </div>
       <input
@@ -109,5 +82,34 @@ export function CloudPanel({
         {sent && <button type="button" onClick={() => { setSent(false); setCode(''); }}>Другой email</button>}
       </div>
     </form>
+  );
+}
+
+export function CloudPanel({
+  session,
+  status,
+  message,
+  onSync
+}: {
+  session: Session | null;
+  status: SyncStatus;
+  message: string | null;
+  onSync: () => void;
+}) {
+  if (!cloudConfigured) return null;
+  if (!session) return <AuthForm />;
+
+  return (
+    <div className="cloud-panel">
+      <div className="data-sheet-copy">
+        <strong>Облако</strong>
+        <span>{session.user.email}</span>
+        <span>{STATUS_LABELS[status]}{message ? `: ${message}` : ''}</span>
+      </div>
+      <div className="backup-actions">
+        <button type="button" disabled={status === 'syncing'} onClick={onSync}>Синхронизировать</button>
+        <button type="button" onClick={() => void signOut()}>Выйти</button>
+      </div>
+    </div>
   );
 }

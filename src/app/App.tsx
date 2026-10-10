@@ -23,6 +23,8 @@ import { ProgressScreen } from './views/ProgressScreen';
 import { LifeScreen, type BeforeInstallPromptEvent } from './views/LifeScreen';
 import { NotesScreen } from './views/NotesScreen';
 import { CloudPanel } from './components/CloudPanel';
+import { cloudConfigured } from '../infrastructure/cloud';
+import { WelcomeScreen } from './views/WelcomeScreen';
 import { useCloudSync } from './cloudSync';
 
 type View = 'day' | PeriodView | 'life' | 'notes';
@@ -253,6 +255,14 @@ export function App() {
     onPulled: useCallback(() => { void service.init().then(() => refresh(viewRef.current)); }, [service, refresh])
   });
 
+  const [skippedAuth, setSkippedAuth] = useState(() => {
+    try { return localStorage.getItem('ritmo.skipAuth') === '1'; } catch { return false; }
+  });
+  const skipAuth = () => {
+    try { localStorage.setItem('ritmo.skipAuth', '1'); } catch { /* storage unavailable */ }
+    setSkippedAuth(true);
+  };
+
   const exportBackup = async () => {
     try {
       const backup = await service.exportBackup();
@@ -297,6 +307,11 @@ export function App() {
     const result = await installPrompt.userChoice;
     if (result.outcome === 'accepted') setInstallPrompt(null);
   };
+
+  if (cloudConfigured && !cloud.ready) return null;
+  if (cloudConfigured && !cloud.session && !skippedAuth) {
+    return <WelcomeScreen onSkip={skipAuth} />;
+  }
 
   const shown = screen && pendingDelete ? withoutIds(screen, pendingDelete.ids) : screen;
 
