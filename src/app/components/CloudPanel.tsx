@@ -13,6 +13,7 @@ const STATUS_LABELS: Record<SyncStatus, string> = {
 
 /** Email + one-time code. The same flow signs in and registers. */
 export function AuthForm({ intro, className = 'cloud-panel' }: { intro?: string; className?: string }) {
+  const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [code, setCode] = useState('');
   const [sent, setSent] = useState(false);
@@ -38,7 +39,7 @@ export function AuthForm({ intro, className = 'cloud-panel' }: { intro?: string;
         event.preventDefault();
         void run(async () => {
           if (!sent) {
-            await requestCode(email.trim());
+            await requestCode(email.trim(), name.trim() || undefined);
             setSent(true);
           } else {
             await verifyCode(email.trim(), code.trim());
@@ -56,6 +57,13 @@ export function AuthForm({ intro, className = 'cloud-panel' }: { intro?: string;
             : intro ?? 'Войдите по email, чтобы хранить данные в облаке и открывать их на любом устройстве. Новый аккаунт создастся сам.'}
         </span>
       </div>
+      <input
+        autoComplete="name"
+        placeholder="Имя (для нового аккаунта)"
+        value={name}
+        disabled={sent || busy}
+        onChange={(event) => setName(event.target.value)}
+      />
       <input
         type="email"
         inputMode="email"
@@ -103,7 +111,8 @@ export function CloudPanel({
     <div className="cloud-panel">
       <div className="data-sheet-copy">
         <strong>Облако</strong>
-        <span>{session.user.email}</span>
+        <span>{(session.user.user_metadata?.name as string | undefined) ?? session.user.email}</span>
+      {session.user.user_metadata?.name ? <span>{session.user.email}</span> : null}
         <span>{STATUS_LABELS[status]}{message ? `: ${message}` : ''}</span>
       </div>
       <div className="backup-actions">

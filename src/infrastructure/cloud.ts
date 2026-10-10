@@ -26,10 +26,14 @@ export const onAuthChange = (listener: (session: Session | null) => void) => {
 };
 
 /** Sends a one-time code (and link) to the address; creates the account if new. */
-export const requestCode = async (email: string) => {
+export const requestCode = async (email: string, name?: string) => {
   const { error } = await client().auth.signInWithOtp({
     email,
-    options: { shouldCreateUser: true, emailRedirectTo: window.location.origin + window.location.pathname }
+    options: {
+      shouldCreateUser: true,
+      data: name ? { name } : undefined,
+      emailRedirectTo: window.location.origin + window.location.pathname
+    }
   });
   if (error) throw error;
 };
