@@ -3048,3 +3048,25 @@ input {
     transition-delay: 0ms !important;
   }
 }
+
+.cloud-panel {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 18px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--line, rgba(128, 128, 128, 0.25));
+}
+
+.cloud-panel input {
+  font: inherit;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--line, rgba(128, 128, 128, 0.35));
+  background: transparent;
+  color: inherit;
+}
+
+.cloud-error {
+  color: #c0392b;
+  font-size: 0.9rem;
+}

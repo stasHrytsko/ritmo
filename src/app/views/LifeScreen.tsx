@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useRef, useState, type ReactNode } from 'react';
 import type { LifeView } from '../../application/ritmoService';
 import type { Goal, GoalTask, Routine } from '../../domain/types';
 import { addDays, routineMinutes, toISODate } from '../../domain/time';
@@ -78,7 +78,8 @@ export function LifeScreen({
   onCloseDataMenu,
   onExport,
   onImport,
-  onInstall
+  onInstall,
+  cloudSlot
 }: {
   data: LifeView;
   dataMenuOpen: boolean;
@@ -94,6 +95,7 @@ export function LifeScreen({
   onExport: () => void;
   onImport: (file?: File) => void;
   onInstall: () => void;
+  cloudSlot?: ReactNode;
 }) {
   const [tab, setTab] = useState<LifeTab>('routines');
   const [editorOpen, setEditorOpen] = useState(false);
@@ -438,9 +440,10 @@ export function LifeScreen({
 
       {dataMenuOpen && (
         <EditorSheet title="Данные" onClose={onCloseDataMenu}>
+          {cloudSlot}
           <div className="data-sheet-copy">
-            <strong>Данные на устройстве</strong>
-            <span>Рутины, цели и вся история отметок хранятся только на этом устройстве.</span>
+            <strong>Бэкап в файл</strong>
+            <span>Рутины, цели и вся история отметок. Локальная копия всегда остаётся на этом устройстве.</span>
           </div>
           <div className="backup-actions">
             <button type="button" onClick={onExport}>Сохранить бэкап</button>

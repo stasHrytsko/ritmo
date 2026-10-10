@@ -22,6 +22,8 @@ import { TodayScreen } from './views/TodayScreen';
 import { ProgressScreen } from './views/ProgressScreen';
 import { LifeScreen, type BeforeInstallPromptEvent } from './views/LifeScreen';
 import { NotesScreen } from './views/NotesScreen';
+import { CloudPanel } from './components/CloudPanel';
+import { useCloudSync } from './cloudSync';
 
 type View = 'day' | PeriodView | 'life' | 'notes';
 
@@ -245,6 +247,12 @@ export function App() {
     await refresh(view);
   };
 
+  const cloud = useCloudSync({
+    exportBackup: useCallback(() => service.exportBackup(), [service]),
+    importBackup: useCallback((payload) => service.importBackup(payload), [service]),
+    onPulled: useCallback(() => { void service.init().then(() => refresh(viewRef.current)); }, [service, refresh])
+  });
+
   const exportBackup = async () => {
     try {
       const backup = await service.exportBackup();
@@ -465,6 +473,14 @@ export function App() {
             onExport={() => void exportBackup()}
             onImport={(file) => void importBackup(file)}
             onInstall={() => void installApp()}
+            cloudSlot={(
+              <CloudPanel
+                session={cloud.session}
+                status={cloud.status}
+                message={cloud.message}
+                onSync={() => void cloud.sync()}
+              />
+            )}
           />
         )}
       </main>
