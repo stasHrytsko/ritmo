@@ -12,7 +12,15 @@ const STATUS_LABELS: Record<SyncStatus, string> = {
 };
 
 /** Email + one-time code. The same flow signs in and registers. */
-export function AuthForm({ intro, className = 'cloud-panel' }: { intro?: string; className?: string }) {
+export function AuthForm({
+  intro,
+  className = 'cloud-panel',
+  showTitle = true
+}: {
+  intro?: string;
+  className?: string;
+  showTitle?: boolean;
+}) {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [code, setCode] = useState('');
@@ -50,7 +58,7 @@ export function AuthForm({ intro, className = 'cloud-panel' }: { intro?: string;
       }}
     >
       <div className="data-sheet-copy">
-        <strong>Облако</strong>
+        {showTitle && <strong>Облако</strong>}
         <span>
           {sent
             ? `Мы отправили код на ${email}. Введите его — или откройте ссылку из письма.`
@@ -86,7 +94,7 @@ export function AuthForm({ intro, className = 'cloud-panel' }: { intro?: string;
       )}
       {error && <span role="alert" className="cloud-error">{error}</span>}
       <div className="backup-actions">
-        <button type="submit" disabled={busy}>{sent ? 'Войти' : 'Получить код'}</button>
+        <button type="submit" className="primary" disabled={busy}>{sent ? 'Войти' : 'Получить код'}</button>
         {sent && <button type="button" onClick={() => { setSent(false); setCode(''); }}>Другой email</button>}
       </div>
     </form>

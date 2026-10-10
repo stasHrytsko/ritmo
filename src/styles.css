@@ -3104,3 +3104,27 @@ input {
   text-decoration: underline;
   font: inherit;
 }
+
+.cloud-panel input {
+  border-color: var(--line-strong);
+  background: var(--surface);
+}
+
+.cloud-panel input:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.cloud-panel .backup-actions button.primary {
+  background: var(--accent);
+  color: #fff;
+  font-weight: 600;
+}
+
+.cloud-panel .backup-actions button:disabled {
+  opacity: 0.6;
+}
+
+.welcome-form .backup-actions {
+  grid-template-columns: 1fr;
+}

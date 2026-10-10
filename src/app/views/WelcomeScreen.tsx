@@ -8,6 +8,7 @@ export function WelcomeScreen({ onSkip }: { onSkip: () => void }) {
       <p className="welcome-lead">Рутины, цели и заметки — в одном ритме. Войдите или создайте аккаунт, чтобы данные были в облаке и на всех ваших устройствах.</p>
       <AuthForm
         className="cloud-panel welcome-form"
+        showTitle={false}
         intro="Введите email — мы пришлём код. Если аккаунта ещё нет, он создастся автоматически."
       />
       <button type="button" className="welcome-skip" onClick={onSkip}>
