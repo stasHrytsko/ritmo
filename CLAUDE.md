@@ -111,3 +111,4 @@ Telegram-бот с напоминаниями как канал роста, RuSt
 - `docs/weekly-cards.md` — банк карт (источник для `npm run cards`).
 - `docs/monetization.md` — модель денег: ядро бесплатно, платно — косметика.
 - `docs/ai-connectors.md` — идея коннектора Claude/ChatGPT к заметкам (отложено).
+- `docs/strategy-global-2026.md` — черновик: англоязычный рынок, новое имя, локальный ИИ (ждёт решений владельца).
