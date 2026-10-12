@@ -3395,28 +3395,39 @@ input {
 }
 
 .card-back {
-  min-height: 92px;
-  border: 0;
-  border-radius: 14px;
-  color: #fff;
+  min-height: 88px;
+  border: 1.5px dashed var(--line-strong);
+  border-radius: 16px;
+  background: var(--row);
+  color: var(--ink);
   font: inherit;
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
   display: grid;
-  place-items: end center;
-  padding: 10px 6px;
-  background:
-    repeating-linear-gradient(45deg, rgba(255, 255, 255, .12) 0 6px, transparent 6px 12px),
-    var(--accent);
-  transition: transform .2s var(--spring);
+  grid-template-rows: 1fr auto;
+  justify-items: center;
+  align-items: center;
+  gap: 6px;
+  padding: 12px 6px 10px;
+  transition: transform .2s var(--spring), border-color .2s;
 }
 
-.card-back:active { transform: scale(.96) rotate(-1deg); }
+.card-back:active { transform: scale(.97); }
 .card-back:disabled { opacity: .6; }
-.card-back.tier-easy { background-color: #7aa874; }
-.card-back.tier-medium { background-color: var(--accent); }
-.card-back.tier-hard { background-color: #6b5b95; }
+
+/* Difficulty as one, two or three dots instead of a colour. */
+.card-back::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 0 transparent;
+}
+
+.card-back.tier-medium::before { box-shadow: 12px 0 0 0 var(--accent); margin-right: 12px; }
+.card-back.tier-hard::before { box-shadow: 12px 0 0 0 var(--accent), 24px 0 0 0 var(--accent); margin-right: 24px; }
 
 .card-banner-title {
   display: block;
@@ -3430,8 +3441,8 @@ input {
   min-height: 44px;
   border: 0;
   border-radius: 14px;
-  background: var(--accent);
-  color: #fff;
+  background: var(--ink);
+  color: var(--on-ink);
   font: inherit;
   font-weight: 600;
   cursor: pointer;
