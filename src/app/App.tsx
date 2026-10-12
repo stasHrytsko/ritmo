@@ -73,6 +73,8 @@ export function App() {
   const [error, setError] = useState<string | null>(null);
   const [dataMenuOpen, setDataMenuOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  // Today can ask Life to open straight into a new routine.
+  const [newRoutineIntent, setNewRoutineIntent] = useState(false);
   const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(null);
   // Something new landed in Life from a note; the tab says so until visited.
@@ -395,6 +397,10 @@ export function App() {
             onSelectDay={selectDay}
             onPickCard={pickCard}
             onCompleteCard={completeCard}
+            onAddRoutine={() => {
+              setNewRoutineIntent(true);
+              navigate('life');
+            }}
           />
         )}
 
@@ -460,6 +466,8 @@ export function App() {
         {shown?.view === 'life' && (
           <LifeScreen
             data={shown.data}
+            openNewRoutine={newRoutineIntent}
+            onNewRoutineOpened={() => setNewRoutineIntent(false)}
             dataMenuOpen={dataMenuOpen}
             installPrompt={installPrompt}
             onSaveRoutine={async (draft, existing) => {

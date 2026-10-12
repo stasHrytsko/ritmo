@@ -5,7 +5,8 @@ import { monthGenitive, plural, routineMinutes, toISODate, weekdayName } from '.
 import { AccordionHeader, Empty } from '../components/ui';
 import { Celebration } from '../components/Celebration';
 import { Collapse } from '../components/Collapse';
-import { Check, Chevron } from '../components/icons';
+import { Check, Chevron, MedalMark } from '../components/icons';
+import { TIER_LABELS } from '../../domain/award';
 import { RoutineTimeline } from '../components/RoutineTimeline';
 import { WeeklyCardBanner } from '../components/WeeklyCardBanner';
 import { useTick } from '../components/useTick';
@@ -20,7 +21,8 @@ export function TodayScreen({
   onToggleTask,
   onSelectDay,
   onPickCard,
-  onCompleteCard
+  onCompleteCard,
+  onAddRoutine
 }: {
   data: TodayView;
   onToggleRoutine: (routineId: string) => Promise<void>;
@@ -28,6 +30,8 @@ export function TodayScreen({
   onSelectDay: (day: ISODate | undefined) => void;
   onPickCard: (weekId: ISODate, cardId: string) => Promise<void>;
   onCompleteCard: (weekId: ISODate) => Promise<void>;
+  /** Opens the routine editor; offered when there is nothing to track yet. */
+  onAddRoutine: () => void;
 }) {
   const [sections, setSections] = useState({ goals: true, routine: true, anytime: true });
   const [openGoals, setOpenGoals] = useState<Record<string, boolean>>({});
@@ -54,6 +58,7 @@ export function TodayScreen({
   const anytimeTick = useTick(onToggleRoutine, false);
 
   const scheduledCount = data.routines.filter((state) => state.scheduled).length;
+  const scheduledDone = data.routines.filter((state) => state.scheduled && state.done).length;
   const goalTaskCount = data.goals.reduce((sum, item) => sum + item.tasks.length, 0);
   const yearPercent = Math.round(data.yearProgress * 100);
   const dateKey = toISODate(data.date);
@@ -188,12 +193,29 @@ export function TodayScreen({
           </div>
         )}
 
-        {data.medal && (
+        {data.routines.length === 0 ? (
+          <div className="first-run">
+            <strong>С чего начнём?</strong>
+            <span>Добавьте первую рутину — то, что хочется делать регулярно. Она появится здесь, на ленте дня.</span>
+            <button type="button" className="primary" onClick={onAddRoutine}>Добавить рутину</button>
+          </div>
+        ) : data.medal ? (
           <div className="medal-card">
             <div className="medal-mark"><Check /></div>
             <strong>День закрыт</strong>
           </div>
-        )}
+        ) : scheduledCount > 0 ? (
+          <div className="day-summary" role="status">
+            <span className="day-summary-copy">
+              <strong>{scheduledDone} из {scheduledCount}</strong>
+              <small>{data.tier ? `Пока ${TIER_LABELS[data.tier].toLowerCase()}` : summaryHint(scheduledDone, scheduledCount)}</small>
+            </span>
+            {data.tier && <MedalMark tier={data.tier} className="day-summary-medal" />}
+            <i className="day-summary-bar" aria-hidden="true">
+              <b style={{ width: `${Math.round((scheduledDone / scheduledCount) * 100)}%` }} />
+            </i>
+          </div>
+        ) : null}
 
         {data.isToday && (
           <WeeklyCardBanner
@@ -270,7 +292,7 @@ export function TodayScreen({
           </section>
         )}
 
-        <section className="content-block accordion-block">
+        {timed.length > 0 && <section className="content-block accordion-block">
           <AccordionHeader
             title="Рутина"
             open={sections.routine}
@@ -290,14 +312,12 @@ export function TodayScreen({
                   tier={data.tier}
                   onToggle={onToggleRoutine}
                 />
-              ) : (
-                <Empty text="На этот день рутин по времени нет." />
-              )}
+              ) : null}
             </div>
           </Collapse>
-        </section>
+        </section>}
 
-        <section className="content-block accordion-block">
+        {anytime.length > 0 && <section className="content-block accordion-block">
           <AccordionHeader
             title="В любое время"
             meta={`${anytime.filter((item) => item.done).length}/${anytime.length}`}
@@ -324,10 +344,13 @@ export function TodayScreen({
                   </button>
                 );
               })}
-              {anytime.length === 0 && <Empty text="На этот день таких рутин нет." />}
             </div>
           </Collapse>
-        </section>
+        </section>}
+
+        {data.routines.length > 0 && scheduledCount === 0 && (
+          <Empty text="На этот день по плану ничего нет — отдыхайте." />
+        )}
       </div>
 
       {celebrating && (
@@ -339,4 +362,11 @@ export function TodayScreen({
       )}
     </section>
   );
+}
+
+/** Below half there is no medal yet; say how far bronze is instead. */
+function summaryHint(done: number, total: number) {
+  const toBronze = Math.ceil(total * 0.5) - done;
+  if (done === 0) return 'Отметьте первую — и день начался';
+  return `Ещё ${toBronze} до бронзы`;
 }

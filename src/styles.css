@@ -3328,7 +3328,7 @@ input {
 /* Medals: one set of colours for every scale. */
 :root {
   --gold: #d99a14;
-  --silver: #9aa3ae;
+  --silver: #8798ac;
   --bronze: #bf6f3a;
 }
 
@@ -3338,7 +3338,6 @@ input {
   flex: none;
 }
 
-.icon-medal circle { fill: currentColor; }
 .icon-medal path {
   fill: none;
   stroke: #fff;
@@ -3635,4 +3634,82 @@ input {
 /* The sheet takes focus itself so the keyboard stays closed; no ring needed. */
 .editor-sheet:focus {
   outline: none;
+}
+
+/* Today: one line that says how the day stands. */
+.day-summary {
+  margin: 2px 0 14px;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 6px 12px;
+  padding: 14px 16px;
+  border-radius: 20px;
+  background: var(--card);
+  box-shadow: var(--shadow-sm);
+}
+
+.day-summary-copy {
+  display: grid;
+  gap: 2px;
+}
+
+.day-summary-copy strong {
+  font-size: 18px;
+  font-variant-numeric: tabular-nums;
+}
+
+.day-summary-copy small {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.day-summary-medal {
+  width: 28px;
+  height: 28px;
+}
+
+.day-summary-bar {
+  grid-column: 1 / -1;
+  height: 4px;
+  border-radius: 99px;
+  background: var(--track);
+  overflow: hidden;
+}
+
+.day-summary-bar b {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--ink);
+  transition: width .5s var(--ease-out);
+}
+
+.done-pill-mark.is-empty {
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px var(--line-strong);
+}
+
+.first-run {
+  margin: 2px 0 14px;
+  display: grid;
+  gap: 8px;
+  padding: 18px 16px;
+  border-radius: 20px;
+  background: var(--card);
+  box-shadow: var(--shadow-sm);
+}
+
+.first-run strong {
+  font-size: 18px;
+}
+
+.first-run span {
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.first-run .primary {
+  margin-top: 6px;
 }

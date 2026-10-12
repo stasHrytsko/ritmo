@@ -140,8 +140,8 @@ export function RoutineTimeline({
         disabled={done.length === 0}
         onClick={() => setShowDone((current) => !current)}
       >
-        <span className={`done-pill-mark${tier ? ' has-tier' : ''}`}>
-          {tier ? <MedalMark tier={tier} /> : <Check />}
+        <span className={`done-pill-mark${tier ? ' has-tier' : ''}${done.length === 0 ? ' is-empty' : ''}`}>
+          {tier ? <MedalMark tier={tier} /> : done.length > 0 ? <Check /> : null}
         </span>
         <span>
           Выполнено

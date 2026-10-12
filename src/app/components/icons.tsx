@@ -72,11 +72,25 @@ export function TrashMark() {
   );
 }
 
-/** Gold, silver or bronze: a solid disc in the medal's colour with a tick. */
+const MEDAL_STOPS: Record<Tier, [string, string]> = {
+  gold: ['#f6cf5a', '#c98a10'],
+  silver: ['#eef2f6', '#8798ac'],
+  bronze: ['#ecae7d', '#a5592a']
+};
+
+/** Gold, silver or bronze: a metallic disc with a tick, so silver never reads as "off". */
 export function MedalMark({ tier, className = '' }: { tier: Tier; className?: string }) {
+  const id = `medal-${tier}`;
+  const [light, dark] = MEDAL_STOPS[tier];
   return (
     <svg className={`icon-medal tier-${tier} ${className}`.trim()} viewBox="0 0 16 16" aria-hidden="true">
-      <circle cx="8" cy="8" r="7" />
+      <defs>
+        <linearGradient id={id} x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stopColor={light} />
+          <stop offset="1" stopColor={dark} />
+        </linearGradient>
+      </defs>
+      <circle cx="8" cy="8" r="7" fill={`url(#${id})`} />
       <path d="M5 8.3l2 2 4-4.4" />
     </svg>
   );

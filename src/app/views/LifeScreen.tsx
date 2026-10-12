@@ -1,4 +1,4 @@
-import { useRef, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { LifeView } from '../../application/ritmoService';
 import type { Goal, GoalTask, Routine } from '../../domain/types';
 import { addDays, routineMinutes, toISODate } from '../../domain/time';
@@ -66,6 +66,8 @@ const emptyGoalDraft = (): GoalDraft => ({
 
 export function LifeScreen({
   data,
+  openNewRoutine = false,
+  onNewRoutineOpened,
   dataMenuOpen,
   installPrompt,
   onSaveRoutine,
@@ -82,6 +84,8 @@ export function LifeScreen({
   cloudSlot
 }: {
   data: LifeView;
+  openNewRoutine?: boolean;
+  onNewRoutineOpened?: () => void;
   dataMenuOpen: boolean;
   installPrompt: BeforeInstallPromptEvent | null;
   onSaveRoutine: (draft: RoutineDraft, existing?: Routine) => Promise<void>;
@@ -103,6 +107,14 @@ export function LifeScreen({
   const [goalDraft, setGoalDraft] = useState<GoalDraft>(emptyGoalDraft);
   const [taskDraft, setTaskDraft] = useState('');
   const importRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!openNewRoutine) return;
+    setTab('routines');
+    setRoutineDraft(emptyRoutineDraft());
+    setEditorOpen(true);
+    onNewRoutineOpened?.();
+  }, [openNewRoutine, onNewRoutineOpened]);
 
   const closeRoutineEditor = () => {
     setRoutineDraft(emptyRoutineDraft());
