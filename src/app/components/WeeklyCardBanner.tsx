@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { WeeklyCardView } from '../../application/ritmoService';
 import { CARD_TIER_LABELS } from '../../domain/weeklyCards';
-import { Check } from './icons';
+import { Check, StarRow } from './icons';
 
 const until = (deadline: Date) =>
   `до ${deadline.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' })}`;
@@ -48,7 +48,10 @@ export function WeeklyCardBanner({
     return (
       <section className={`card-banner is-open tier-${face.tier}`} aria-label="Карта недели">
         <div className="card-banner-head">
-          <span className="card-banner-tier">{CARD_TIER_LABELS[face.tier]}</span>
+          <span className="card-banner-tier">
+            <StarRow tier={face.tier} />
+            {CARD_TIER_LABELS[face.tier]}
+          </span>
           <span className="card-banner-deadline">{until(card.deadline)}</span>
         </div>
         <strong className="card-banner-title">{face.title}</strong>
@@ -77,6 +80,7 @@ export function WeeklyCardBanner({
             aria-label={`${CARD_TIER_LABELS[option.tier]} карта`}
             onClick={() => void run(() => onPick(option.id))}
           >
+            <StarRow tier={option.tier} />
             <span>{CARD_TIER_LABELS[option.tier]}</span>
           </button>
         ))}

@@ -3416,18 +3416,31 @@ input {
 .card-back:active { transform: scale(.97); }
 .card-back:disabled { opacity: .6; }
 
-/* Difficulty as one, two or three dots instead of a colour. */
-.card-back::before {
-  content: '';
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--accent);
-  box-shadow: 0 0 0 0 transparent;
+.star-row {
+  display: inline-flex;
+  gap: 3px;
+  color: var(--accent);
 }
 
-.card-back.tier-medium::before { box-shadow: 12px 0 0 0 var(--accent); margin-right: 12px; }
-.card-back.tier-hard::before { box-shadow: 12px 0 0 0 var(--accent), 24px 0 0 0 var(--accent); margin-right: 24px; }
+.star-row svg {
+  width: 17px;
+  height: 17px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linejoin: round;
+}
+
+.card-banner-tier {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.card-banner-tier .star-row svg {
+  width: 13px;
+  height: 13px;
+}
 
 .card-banner-title {
   display: block;
