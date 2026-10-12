@@ -104,3 +104,34 @@ export const writeSyncState = (state: SyncState) => {
 export const clearSyncState = () => {
   try { localStorage.removeItem(SYNC_KEY); } catch { /* storage unavailable */ }
 };
+
+export type AvatarKind = 'male' | 'female';
+export type ReminderMode = 'off' | 'morning' | 'evening' | 'each';
+
+export interface Profile {
+  name: string;
+  avatar: AvatarKind;
+  reminder: ReminderMode;
+}
+
+export const profileOf = (session: Session): Profile => {
+  const meta = session.user.user_metadata ?? {};
+  return {
+    name: typeof meta.name === 'string' ? meta.name : '',
+    avatar: meta.avatar === 'female' ? 'female' : 'male',
+    reminder: ['morning', 'evening', 'each'].includes(meta.reminder as string)
+      ? (meta.reminder as ReminderMode)
+      : 'off'
+  };
+};
+
+export const saveProfile = async (profile: Profile) => {
+  const { error } = await client().auth.updateUser({ data: { ...profile } });
+  if (error) throw error;
+};
+
+/** Supabase sends a confirmation to the new address; the change applies once confirmed. */
+export const changeEmail = async (email: string) => {
+  const { error } = await client().auth.updateUser({ email });
+  if (error) throw error;
+};

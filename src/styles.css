@@ -3128,3 +3128,144 @@ input {
 .welcome-form .backup-actions {
   grid-template-columns: 1fr;
 }
+
+.topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.topbar-avatar {
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  line-height: 0;
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+}
+
+.avatar-bg { fill: var(--line-strong); }
+.avatar-fg { fill: var(--muted); }
+.avatar-skin { fill: var(--surface-strong); }
+
+.profile-form {
+  display: grid;
+  gap: 14px;
+}
+
+.avatar-picker {
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+}
+
+.avatar-picker button {
+  padding: 3px;
+  border: 2px solid transparent;
+  border-radius: 50%;
+  background: transparent;
+  line-height: 0;
+  cursor: pointer;
+}
+
+.avatar-picker button.selected {
+  border-color: var(--accent);
+}
+
+.profile-field {
+  display: grid;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.profile-field input {
+  font: inherit;
+  font-size: 16px;
+  color: var(--ink, inherit);
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--line-strong);
+  background: var(--surface);
+}
+
+.profile-field input:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.profile-reminders {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.profile-reminders legend {
+  padding: 0;
+  margin-bottom: 8px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.profile-reminders label {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid var(--line-strong);
+  cursor: pointer;
+}
+
+.profile-reminders label.selected {
+  border-color: var(--accent);
+}
+
+.profile-reminders label span {
+  display: grid;
+  gap: 2px;
+}
+
+.profile-reminders small {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.profile-reminders input {
+  accent-color: var(--accent);
+  margin-top: 3px;
+}
+
+.profile-note {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.profile-sync {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.profile-sync button {
+  border: 0;
+  background: none;
+  color: inherit;
+  text-decoration: underline;
+  font: inherit;
+  cursor: pointer;
+}
+
+.profile-reminders input[type="radio"] {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  min-height: 0;
+  padding: 0;
+  margin-top: 2px;
+}

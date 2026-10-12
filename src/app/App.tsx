@@ -25,6 +25,9 @@ import { NotesScreen } from './views/NotesScreen';
 import { CloudPanel } from './components/CloudPanel';
 import { cloudConfigured } from '../infrastructure/cloud';
 import { WelcomeScreen } from './views/WelcomeScreen';
+import { Avatar } from './components/Avatar';
+import { ProfileSheet } from './components/ProfileSheet';
+import { profileOf } from '../infrastructure/cloud';
 import { useCloudSync } from './cloudSync';
 
 type View = 'day' | PeriodView | 'life' | 'notes';
@@ -68,6 +71,7 @@ export function App() {
   const [busy, setBusy] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [dataMenuOpen, setDataMenuOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
   const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(null);
   // Something new landed in Life from a note; the tab says so until visited.
@@ -319,19 +323,40 @@ export function App() {
     <div className="app-shell">
       <header className="topbar">
         <button type="button" className="brand" onClick={() => navigate('day')}>Ritmo<span>.</span></button>
-        {view === 'life' ? (
-          <button
-            type="button"
-            className="topbar-menu"
-            aria-label="Данные"
-            onClick={() => setDataMenuOpen(true)}
-          >
-            ⋯
-          </button>
-        ) : (
-          <TopbarMark view={view} screen={screen} />
-        )}
+        <div className="topbar-right">
+          {view === 'life' ? (
+            <button
+              type="button"
+              className="topbar-menu"
+              aria-label="Данные"
+              onClick={() => setDataMenuOpen(true)}
+            >
+              ⋯
+            </button>
+          ) : (
+            <TopbarMark view={view} screen={screen} />
+          )}
+          {cloudConfigured && (
+            <button
+              type="button"
+              className="topbar-avatar"
+              aria-label="Профиль"
+              onClick={() => setProfileOpen(true)}
+            >
+              <Avatar kind={cloud.session ? profileOf(cloud.session).avatar : 'male'} size={40} />
+            </button>
+          )}
+        </div>
       </header>
+
+      {profileOpen && (
+        <ProfileSheet
+          session={cloud.session}
+          status={cloud.status}
+          onSync={() => void cloud.sync()}
+          onClose={() => setProfileOpen(false)}
+        />
+      )}
 
       <main>
         {error && (
