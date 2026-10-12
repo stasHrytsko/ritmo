@@ -3880,3 +3880,222 @@ input {
   font-size: 13px;
   text-align: center;
 }
+
+/* First-run onboarding. */
+.onboarding {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  max-width: 480px;
+  margin: 0 auto;
+  padding:
+    calc(16px + env(safe-area-inset-top))
+    16px
+    calc(20px + env(safe-area-inset-bottom));
+  background: var(--bg);
+  overflow-y: auto;
+}
+
+.onboarding-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  min-height: 44px;
+}
+
+.onboarding-top .brand {
+  cursor: default;
+}
+
+.onboarding-skip {
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.onboarding-slide {
+  align-self: center;
+  display: grid;
+  gap: 12px;
+  padding: 24px 0;
+  animation: screen-enter .3s ease-out;
+}
+
+.onboarding-slide h1 {
+  margin: 0;
+  font-size: 30px;
+  line-height: 1.1;
+  letter-spacing: -.03em;
+}
+
+.onboarding-slide p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+.onboarding-art {
+  height: 180px;
+  margin-bottom: 12px;
+  border-radius: 24px;
+  background: var(--card);
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+}
+
+.onboarding-art.medals .icon-medal {
+  width: 56px;
+  height: 56px;
+}
+
+.onboarding-art.medals .icon-medal.tier-gold {
+  width: 76px;
+  height: 76px;
+}
+
+.onboarding-art.cards .card-back {
+  width: 78px;
+  min-height: 104px;
+  cursor: default;
+}
+
+.onboarding-art.timeline {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+  padding: 0 24px;
+}
+
+.onboarding-art.timeline span {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 15px;
+}
+
+.onboarding-art.timeline b {
+  width: 46px;
+  font-size: 13px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.onboarding-art.timeline i {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 1.5px solid var(--line-strong);
+}
+
+.onboarding-art.timeline i.done {
+  border: 0;
+  background: var(--ink);
+}
+
+.onboarding-art.timeline .now b {
+  color: var(--accent);
+}
+
+.onboarding-art.timeline .now em {
+  flex: 1;
+  height: 2px;
+  background: var(--accent);
+}
+
+.onboarding-bottom {
+  display: grid;
+  gap: 16px;
+}
+
+.onboarding-bottom .primary {
+  margin-top: 0;
+}
+
+.onboarding-dots {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+}
+
+.onboarding-dots i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--line-strong);
+  transition: width .25s;
+}
+
+.onboarding-dots i.on {
+  width: 22px;
+  border-radius: 99px;
+  background: var(--ink);
+}
+
+.template-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.template-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 60px;
+  padding: 10px 14px;
+  border: 0;
+  border-radius: 16px;
+  background: var(--card);
+  box-shadow: var(--shadow-sm);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.template-row span {
+  display: grid;
+  gap: 2px;
+}
+
+.template-row small {
+  color: var(--muted);
+  font-size: 12.5px;
+}
+
+.template-row .task-check {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1.5px var(--line-strong);
+}
+
+.template-row .task-check .icon-check {
+  width: 14px;
+  height: 14px;
+  opacity: 0;
+}
+
+.template-row.on .task-check {
+  background: var(--ink);
+  box-shadow: none;
+}
+
+.template-row.on .task-check .icon-check {
+  opacity: 1;
+  stroke: var(--on-ink);
+}
+
+.template-row.on .task-check .icon-check {
+  stroke-dashoffset: 0;
+  transition: stroke-dashoffset .2s ease-out;
+}

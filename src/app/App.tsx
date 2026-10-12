@@ -27,6 +27,7 @@ import { ConfirmHost } from './components/ConfirmHost';
 import { askConfirm } from './components/confirm';
 import { cloudConfigured } from '../infrastructure/cloud';
 import { WelcomeScreen } from './views/WelcomeScreen';
+import { Onboarding } from './views/Onboarding';
 import { Avatar } from './components/Avatar';
 import { ProfileSheet } from './components/ProfileSheet';
 import { profileOf } from '../infrastructure/cloud';
@@ -72,6 +73,7 @@ export function App() {
   const [error, setError] = useState<string | null>(null);
   const [profileOpen, setProfileOpen] = useState(false);
   const online = useOnline();
+  const [onboarded, setOnboarded] = useState<Record<string, boolean>>({});
   // Today can ask Life to open straight into a new routine.
   const [newRoutineIntent, setNewRoutineIntent] = useState(false);
   const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
@@ -260,6 +262,8 @@ export function App() {
     resetLocal: useCallback(() => service.resetLocal(), [service]),
     onPulled: useCallback(() => { void service.init().then(() => refresh(viewRef.current)); }, [service, refresh])
   });
+  const onboardingKey = `ritmo.onboarded:${cloud.session?.user.id ?? 'local'}`;
+  const hasOnboarded = onboarded[onboardingKey] ?? readFlag(onboardingKey);
 
   const pickCard = async (weekId: ISODate, cardId: string) => {
     try {
@@ -346,6 +350,26 @@ export function App() {
   }
 
   const shown = screen && pendingDelete ? withoutIds(screen, pendingDelete.ids) : screen;
+
+  // First run: nothing tracked yet and the intro not seen on this device.
+  if (screen?.view === 'day' && screen.data.routines.length === 0 && !hasOnboarded) {
+    return (
+      <Onboarding
+        onFinish={async (templates) => {
+          try {
+            for (const template of templates) {
+              await service.createRoutine(template.name, template.weekdays, template.timing, template.time);
+            }
+          } catch (cause) {
+            setError(describeError(cause));
+          }
+          writeFlag(onboardingKey);
+          setOnboarded((current) => ({ ...current, [onboardingKey]: true }));
+          await refresh('day');
+        }}
+      />
+    );
+  }
 
   return (
     <div className="app-shell">
@@ -694,4 +718,12 @@ function useOnline() {
     };
   }, []);
   return online;
+}
+
+function readFlag(key: string) {
+  try { return localStorage.getItem(key) === '1'; } catch { return false; }
+}
+
+function writeFlag(key: string) {
+  try { localStorage.setItem(key, '1'); } catch { /* storage unavailable */ }
 }
