@@ -3609,3 +3609,8 @@ input {
 .profile-form .backup-actions button:disabled {
   opacity: .6;
 }
+
+/* The sheet takes focus itself so the keyboard stays closed; no ring needed. */
+.editor-sheet:focus {
+  outline: none;
+}

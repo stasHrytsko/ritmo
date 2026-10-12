@@ -25,15 +25,14 @@ export function EditorSheet({
   const close = useRef(onClose);
   close.current = onClose;
 
-  // Captured during the first render, before React's commit phase applies
-  // autoFocus inside the sheet and makes that the active element.
+  // Captured during the first render, before focus moves into the sheet.
   const [opener] = useState(() => document.activeElement as HTMLElement | null);
 
   useEffect(() => {
-    // autoFocus may already have put the cursor somewhere useful; only pull
-    // focus in when it is still outside.
+    // Focus goes to the sheet itself, never to a field: a text field in focus
+    // opens the phone's keyboard, and that should wait for a tap on the field.
     if (!sheet.current?.contains(document.activeElement)) {
-      sheet.current?.querySelector<HTMLElement>(FOCUSABLE)?.focus();
+      sheet.current?.focus({ preventScroll: true });
     }
     return () => {
       if (opener && opener !== document.body && document.contains(opener)) opener.focus();
@@ -78,6 +77,7 @@ export function EditorSheet({
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
+        tabIndex={-1}
         onClick={(event) => event.stopPropagation()}
       >
         <div className="sheet-handle" />

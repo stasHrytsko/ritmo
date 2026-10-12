@@ -162,7 +162,6 @@ export function NotesScreen({
           <label className="field">
             <span>Название</span>
             <input
-              autoFocus
               value={titleDraft}
               placeholder="Дом, работа, когда-нибудь…"
               onChange={(event) => setTitleDraft(event.target.value)}
@@ -221,7 +220,7 @@ function NoteSheet({
     <EditorSheet title="Заметка" onClose={onClose}>
       <label className="field">
         <span>Название</span>
-        <input autoFocus value={title} onChange={(event) => setTitle(event.target.value)} />
+        <input value={title} onChange={(event) => setTitle(event.target.value)} />
       </label>
 
       <button

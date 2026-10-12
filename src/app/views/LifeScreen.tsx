@@ -261,7 +261,6 @@ export function LifeScreen({
           <label className="field">
             <span>Название</span>
             <input
-              autoFocus
               value={routineDraft.name}
               onChange={(event) => setRoutineDraft({ ...routineDraft, name: event.target.value })}
               placeholder="Зал, вода, выгулять Локи…"
@@ -338,7 +337,6 @@ export function LifeScreen({
           <label className="field">
             <span>Название</span>
             <input
-              autoFocus
               value={goalDraft.name}
               onChange={(event) => setGoalDraft({ ...goalDraft, name: event.target.value })}
               placeholder="Выпустить первую игру"
