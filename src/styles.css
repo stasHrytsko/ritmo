@@ -3196,47 +3196,77 @@ input {
 }
 
 .profile-reminders {
-  display: grid;
-  gap: 8px;
-  margin: 0;
-  padding: 0;
-  border: 0;
-}
-
-.profile-reminders legend {
-  padding: 0;
-  margin-bottom: 8px;
-  font-size: 13px;
-  color: var(--muted);
-}
-
-.profile-reminders label {
-  display: flex;
-  gap: 12px;
-  align-items: flex-start;
-  padding: 12px 14px;
-  border-radius: 14px;
   border: 1px solid var(--line-strong);
+  border-radius: 14px;
+  background: var(--surface);
+}
+
+.profile-reminders-toggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 14px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
   cursor: pointer;
 }
 
-.profile-reminders label.selected {
-  border-color: var(--accent);
+.profile-reminders-toggle span {
+  display: grid;
+  gap: 1px;
 }
 
-.profile-reminders label span {
+.profile-reminders-toggle small {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.profile-reminders-toggle strong {
+  font-size: 15px;
+}
+
+.profile-reminder-options {
+  display: grid;
+  gap: 6px;
+  padding: 0 8px 8px;
+}
+
+.profile-reminder-options label {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 10px 10px;
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.profile-reminder-options label.selected {
+  background: var(--row);
+}
+
+.profile-reminder-options label span {
   display: grid;
   gap: 2px;
 }
 
-.profile-reminders small {
+.profile-reminder-options small {
   color: var(--muted);
   font-size: 12px;
 }
 
-.profile-reminders input {
+.profile-reminder-options input[type="radio"] {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  min-height: 0;
+  padding: 0;
+  margin-top: 2px;
   accent-color: var(--accent);
-  margin-top: 3px;
 }
 
 .profile-note {
@@ -3261,14 +3291,6 @@ input {
   cursor: pointer;
 }
 
-.profile-reminders input[type="radio"] {
-  flex: none;
-  width: 18px;
-  height: 18px;
-  min-height: 0;
-  padding: 0;
-  margin-top: 2px;
-}
 
 /* Medals: one set of colours for every scale. */
 :root {
@@ -3552,4 +3574,27 @@ input {
 
 .card-banner-body {
   padding: 0 14px 14px;
+}
+
+/* Profile actions: same size, and the primary one readable. */
+.profile-form .backup-actions {
+  margin-top: 0;
+  align-items: stretch;
+}
+
+.profile-form .backup-actions button {
+  min-height: 46px;
+  height: 46px;
+}
+
+.profile-form .backup-actions button.primary {
+  margin-top: 0;
+  font-size: 13px;
+  background: var(--accent);
+  color: #fff;
+  font-weight: 600;
+}
+
+.profile-form .backup-actions button:disabled {
+  opacity: .6;
 }

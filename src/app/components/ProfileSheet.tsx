@@ -11,6 +11,8 @@ import {
 import type { SyncStatus } from '../cloudSync';
 import { Avatar } from './Avatar';
 import { AuthForm } from './CloudPanel';
+import { Chevron } from './icons';
+import { Collapse } from './Collapse';
 import { EditorSheet } from './EditorSheet';
 
 const REMINDERS: { value: ReminderMode; label: string; hint: string }[] = [
@@ -64,6 +66,7 @@ function SignedIn({
   const [name, setName] = useState(initial.name);
   const [avatar, setAvatar] = useState<AvatarKind>(initial.avatar);
   const [reminder, setReminder] = useState<ReminderMode>(initial.reminder);
+  const [remindersOpen, setRemindersOpen] = useState(false);
   const [email, setEmail] = useState(session.user.email ?? '');
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<string | null>(null);
@@ -124,20 +127,38 @@ function SignedIn({
           <input type="email" autoComplete="email" required value={email} onChange={(event) => setEmail(event.target.value)} />
         </label>
 
-        <fieldset className="profile-reminders">
-          <legend>Напоминание</legend>
-          {REMINDERS.map((option) => (
-            <label key={option.value} className={reminder === option.value ? 'selected' : ''}>
-              <input
-                type="radio"
-                name="reminder"
-                checked={reminder === option.value}
-                onChange={() => setReminder(option.value)}
-              />
-              <span><strong>{option.label}</strong><small>{option.hint}</small></span>
-            </label>
-          ))}
-        </fieldset>
+        <div className="profile-reminders">
+          <button
+            type="button"
+            className="profile-reminders-toggle"
+            aria-expanded={remindersOpen}
+            onClick={() => setRemindersOpen((current) => !current)}
+          >
+            <span>
+              <small>Напоминание</small>
+              <strong>{REMINDERS.find((option) => option.value === reminder)?.label}</strong>
+            </span>
+            <Chevron />
+          </button>
+          <Collapse open={remindersOpen}>
+            <div className="profile-reminder-options" role="radiogroup" aria-label="Напоминание">
+              {REMINDERS.map((option) => (
+                <label key={option.value} className={reminder === option.value ? 'selected' : ''}>
+                  <input
+                    type="radio"
+                    name="reminder"
+                    checked={reminder === option.value}
+                    onChange={() => {
+                      setReminder(option.value);
+                      setRemindersOpen(false);
+                    }}
+                  />
+                  <span><strong>{option.label}</strong><small>{option.hint}</small></span>
+                </label>
+              ))}
+            </div>
+          </Collapse>
+        </div>
 
         {error && <span role="alert" className="cloud-error">{error}</span>}
         {note && <span className="profile-note">{note}</span>}
