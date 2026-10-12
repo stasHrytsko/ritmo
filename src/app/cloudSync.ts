@@ -12,6 +12,7 @@ import {
   pushBackup,
   readOwner,
   readSyncState,
+  deleteAccount,
   signOut,
   writeOwner,
   writeSyncState
@@ -198,5 +199,29 @@ export function useCloudSync({ exportBackup, importBackup, resetLocal, onPulled 
     }
   }, [sync, resetLocal]);
 
-  return { session, ready, status, message, sync: () => sync(), leave };
+  /** Deleting the account removes it from the cloud and wipes this device. */
+  const remove = useCallback(async () => {
+    const sure = await askConfirm({
+      title: 'Удалить аккаунт?',
+      body: 'Аккаунт и все данные — рутины, цели, заметки и история — будут удалены из облака и с этого устройства. Вернуть их будет нельзя.',
+      confirm: 'Удалить навсегда',
+      danger: true
+    });
+    if (!sure) return;
+
+    try {
+      await deleteAccount();
+    } catch (cause) {
+      setStatus('error');
+      setMessage(describeAuthError(cause));
+      return;
+    }
+    try {
+      await resetLocal();
+    } finally {
+      window.location.reload();
+    }
+  }, [resetLocal]);
+
+  return { session, ready, status, message, sync: () => sync(), leave, remove };
 }

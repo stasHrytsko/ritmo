@@ -8,6 +8,10 @@ export function WelcomeScreen() {
       <h2 className="welcome-title">Свой ритм каждый день</h2>
       <p className="welcome-lead">Рутины, цели и заметки в одном месте.</p>
       <AuthForm className="cloud-panel welcome-form" showTitle={false} />
+      <p className="welcome-legal">
+        Продолжая, вы соглашаетесь с{' '}
+        <a href="./privacy.html" target="_blank" rel="noreferrer">политикой конфиденциальности</a>.
+      </p>
     </div>
   );
 }

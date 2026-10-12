@@ -364,6 +364,7 @@ export function App() {
           status={cloud.status}
           onSync={() => void cloud.sync()}
           onSignOut={() => void cloud.leave()}
+          onDeleteAccount={() => void cloud.remove()}
           onExport={() => void exportBackup()}
           onImport={(file) => void importBackup(file)}
           installPrompt={installPrompt}

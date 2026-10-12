@@ -50,7 +50,9 @@ export default defineConfig({
       workbox: {
         cleanupOutdatedCaches: true,
         globPatterns: ['**/*.{js,css,html,png,svg,webmanifest}'],
-        navigateFallback: 'index.html'
+        navigateFallback: 'index.html',
+        // Static pages next to the app are served as they are, not as the app.
+        navigateFallbackDenylist: [/privacy\.html$/]
       }
     })
   ]

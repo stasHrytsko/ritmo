@@ -43,6 +43,16 @@ export const verifyCode = async (email: string, token: string) => {
   if (error) throw error;
 };
 
+/** Deletes the signed-in account and its cloud data for good. */
+export const deleteAccount = async () => {
+  const { error } = await client().rpc('delete_my_account');
+  if (error) throw error;
+  // The session now points at a user that no longer exists; drop it locally.
+  await client().auth.signOut({ scope: 'local' }).catch(() => undefined);
+  clearSyncState();
+  clearOwner();
+};
+
 export const signOut = async () => {
   await client().auth.signOut();
   clearSyncState();

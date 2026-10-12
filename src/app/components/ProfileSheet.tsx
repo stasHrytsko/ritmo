@@ -27,6 +27,7 @@ const STATUS: Record<SyncStatus, string> = {
 interface Actions {
   onSync: () => void;
   onSignOut: () => void;
+  onDeleteAccount: () => void;
   onExport: () => void;
   onImport: (file?: File) => void;
   installPrompt: BeforeInstallPromptEvent | null;
@@ -55,6 +56,7 @@ function SignedIn({
   status,
   onSync,
   onSignOut,
+  onDeleteAccount,
   onExport,
   onImport,
   installPrompt,
@@ -189,6 +191,8 @@ function SignedIn({
 
       <section className="profile-section profile-account">
         <button type="button" className="profile-signout" onClick={onSignOut}>Выйти</button>
+        <a className="profile-link" href="./privacy.html" target="_blank" rel="noreferrer">Политика конфиденциальности</a>
+        <button type="button" className="danger-link" onClick={onDeleteAccount}>Удалить аккаунт</button>
       </section>
     </EditorSheet>
   );
