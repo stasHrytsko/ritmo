@@ -1,14 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import type { DayStrip } from '../../application/ritmoService';
 import { WEEKDAY_LETTERS, weekdayName } from '../../domain/time';
-import { Check } from './icons';
+import { MedalMark } from './icons';
 
 const RADIUS = 16;
 const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
 
 /**
  * The week at a glance. Each day's ring fills with the share of routines done;
- * a full ring with a tick is the medal. Tapping a day opens it in Today.
+ * its colour is the medal: gold, silver or bronze. Tapping a day opens it in Today.
  */
 export function WeekStrip({ days, onSelect }: { days: DayStrip[]; onSelect?: (date: Date) => void }) {
   // Today's circle answers a tick with a small pulse; loading does not count.
@@ -29,7 +29,8 @@ export function WeekStrip({ days, onSelect }: { days: DayStrip[]; onSelect?: (da
           day.isToday ? 'today' : '',
           day.future ? 'future' : '',
           day.selected ? 'selected' : '',
-          day.medal ? 'medal' : ''
+          day.medal ? 'medal' : '',
+          day.tier ? `tier-${day.tier}` : ''
         ].filter(Boolean).join(' ');
 
         return (
@@ -62,7 +63,7 @@ export function WeekStrip({ days, onSelect }: { days: DayStrip[]; onSelect?: (da
               <em>{day.date.getDate()}</em>
               {day.isToday && pulse > 0 && <i className="ring-pulse" key={pulse} aria-hidden="true" />}
             </b>
-            <i>{day.medal && <Check />}</i>
+            <i>{day.tier && <MedalMark tier={day.tier} />}</i>
           </button>
         );
       })}

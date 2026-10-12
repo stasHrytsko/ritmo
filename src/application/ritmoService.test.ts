@@ -666,3 +666,57 @@ describe('goals stay in sight', () => {
     expect((await service.getToday()).goals).toEqual([]);
   });
 });
+
+describe('weekly card', () => {
+  it('draws the week\'s set once and keeps it', async () => {
+    const first = (await service.getDay()).card;
+    expect(first.state).toBe('choose');
+    expect(first.options).toHaveLength(3);
+    expect(first.options.map((option) => option.tier)).toEqual(['easy', 'medium', 'hard']);
+    expect(first.picked).toBeUndefined();
+
+    const second = (await service.getDay()).card;
+    expect(second.options.map((option) => option.id)).toEqual(first.options.map((option) => option.id));
+    expect(store.weeklyCards).toHaveLength(1);
+    expect(second.weekId).toBe(THIS_WEEK);
+  });
+
+  it('allows one pick per week, then completion', async () => {
+    const { options, weekId } = (await service.getDay()).card;
+    await service.pickWeeklyCard(weekId, options[2].id);
+    await service.pickWeeklyCard(weekId, options[0].id); // too late, ignored
+
+    let card = (await service.getDay()).card;
+    expect(card.state).toBe('active');
+    expect(card.picked?.card.id).toBe(options[2].id);
+
+    await service.completeWeeklyCard(weekId);
+    card = (await service.getDay()).card;
+    expect(card.state).toBe('done');
+    expect((await service.getYear()).cards).toEqual({ easy: 0, medium: 0, hard: 1 });
+  });
+
+  it('ignores a card that is not in the week\'s set', async () => {
+    const { weekId } = (await service.getDay()).card;
+    await service.pickWeeklyCard(weekId, 'easy:Нет такой карты');
+    expect((await service.getDay()).card.state).toBe('choose');
+  });
+});
+
+describe('medal tiers', () => {
+  it('maps the day\'s share done to gold, silver, bronze', async () => {
+    for (const name of ['A', 'B', 'C', 'D']) await addRoutine(name);
+    const done = async (count: number) => {
+      store.completions.length = 0;
+      for (const routine of store.routines.slice(0, count)) {
+        await service.toggleRoutine(service.today(), routine.id);
+      }
+      return (await service.getDay()).tier;
+    };
+
+    expect(await done(4)).toBe('gold');
+    expect(await done(3)).toBe('silver');
+    expect(await done(2)).toBe('bronze');
+    expect(await done(1)).toBeNull();
+  });
+});

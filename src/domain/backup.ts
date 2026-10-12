@@ -131,6 +131,9 @@ export const parseBackup = (raw: unknown): BackupPayload => {
     delete rest.completedAt;
     return rest;
   });
+  const weeklyCards = requireFields(optionalArray(raw, 'weeklyCards'), 'weeklyCards', ['id']).filter(
+    (pick) => Array.isArray(pick.cardIds)
+  );
   const settings = requireFields(requireArray(raw, 'settings'), 'settings', ['key']);
 
   return {
@@ -143,6 +146,7 @@ export const parseBackup = (raw: unknown): BackupPayload => {
     completions: completions as unknown as BackupPayload['completions'],
     notes: titledNotes as unknown as BackupPayload['notes'],
     noteEntries: noteEntries.map(normalizeNoteEntry) as unknown as BackupPayload['noteEntries'],
+    weeklyCards: weeklyCards as unknown as BackupPayload['weeklyCards'],
     settings: settings.map((item) => ({
       ...item,
       schemaVersion: SCHEMA_VERSION

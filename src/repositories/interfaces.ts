@@ -8,7 +8,8 @@ import type {
   NoteEntry,
   Routine,
   RoutineCompletion,
-  WeekRecord
+  WeekRecord,
+  WeeklyCardPick
 } from '../domain/types';
 
 export interface RoutineRepository {
@@ -69,6 +70,12 @@ export interface CompletionRepository {
   removeByRoutine(routineId: string): Promise<void>;
 }
 
+export interface WeeklyCardRepository {
+  get(weekId: ISODate): Promise<WeeklyCardPick | undefined>;
+  list(): Promise<WeeklyCardPick[]>;
+  put(pick: WeeklyCardPick): Promise<void>;
+}
+
 export interface SettingsRepository {
   get(): Promise<AppSettings | undefined>;
   put(settings: AppSettings): Promise<void>;
@@ -87,6 +94,7 @@ export interface Repositories {
   noteEntries: NoteEntryRepository;
   weeks: WeekRepository;
   completions: CompletionRepository;
+  weeklyCards: WeeklyCardRepository;
   settings: SettingsRepository;
   backup: BackupRepository;
 }

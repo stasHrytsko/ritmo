@@ -7,7 +7,8 @@ import type {
   NoteEntry,
   Routine,
   RoutineCompletion,
-  WeekRecord
+  WeekRecord,
+  WeeklyCardPick
 } from '../domain/types';
 
 export interface MemoryStore {
@@ -18,13 +19,14 @@ export interface MemoryStore {
   noteEntries: NoteEntry[];
   weeks: WeekRecord[];
   completions: RoutineCompletion[];
+  weeklyCards: WeeklyCardPick[];
   settings?: AppSettings;
 }
 
 /** In-memory repositories for tests. Mirrors the Dexie adapter's cascades. */
 export function createMemoryRepositories(): { repos: Repositories; store: MemoryStore } {
   const store: MemoryStore = {
-    routines: [], goals: [], goalTasks: [], notes: [], noteEntries: [], weeks: [], completions: []
+    routines: [], goals: [], goalTasks: [], notes: [], noteEntries: [], weeks: [], completions: [], weeklyCards: []
   };
 
   const put = <T extends { id: string }>(list: T[], item: T) => {
@@ -104,6 +106,11 @@ export function createMemoryRepositories(): { repos: Repositories; store: Memory
         return done;
       },
       removeByRoutine: async (routineId) => drop(store.completions, (item) => item.routineId === routineId)
+    },
+    weeklyCards: {
+      get: async (id) => store.weeklyCards.find((item) => item.id === id),
+      list: async () => [...store.weeklyCards],
+      put: async (pick) => put(store.weeklyCards, pick)
     },
     settings: {
       get: async () => store.settings,

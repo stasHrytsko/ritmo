@@ -89,6 +89,11 @@ export const repositories: Repositories = {
       await db.completions.where('routineId').equals(routineId).delete();
     }
   },
+  weeklyCards: {
+    get: (weekId) => db.weeklyCards.get(weekId),
+    list: () => db.weeklyCards.orderBy('createdAt').toArray(),
+    put: async (pick) => { await db.weeklyCards.put(pick); }
+  },
   settings: {
     get: () => db.settings.get('app'),
     put: async (settings) => { await db.settings.put(settings); }
@@ -104,6 +109,7 @@ export const repositories: Repositories = {
       completions: await db.completions.toArray(),
       notes: await db.notes.toArray(),
       noteEntries: await db.noteEntries.toArray(),
+      weeklyCards: await db.weeklyCards.toArray(),
       settings: await db.settings.toArray()
     }),
     importAll: async (payload: BackupPayload) => {
@@ -115,7 +121,7 @@ export const repositories: Repositories = {
         'rw',
         [
           db.routines, db.goals, db.goalTasks, db.notes, db.noteEntries,
-          db.weeks, db.completions, db.settings
+          db.weeks, db.completions, db.weeklyCards, db.settings
         ],
         async () => {
           await Promise.all([
@@ -126,6 +132,7 @@ export const repositories: Repositories = {
             db.noteEntries.clear(),
             db.weeks.clear(),
             db.completions.clear(),
+            db.weeklyCards.clear(),
             db.settings.clear()
           ]);
           await db.routines.bulkPut(restored.routines);
@@ -135,6 +142,7 @@ export const repositories: Repositories = {
           await db.completions.bulkPut(restored.completions);
           await db.notes.bulkPut(restored.notes);
           await db.noteEntries.bulkPut(restored.noteEntries);
+          await db.weeklyCards.bulkPut(restored.weeklyCards);
           await db.settings.bulkPut(restored.settings);
         }
       );

@@ -7,6 +7,7 @@ import { Celebration } from '../components/Celebration';
 import { Collapse } from '../components/Collapse';
 import { Check, Chevron } from '../components/icons';
 import { RoutineTimeline } from '../components/RoutineTimeline';
+import { WeeklyCardBanner } from '../components/WeeklyCardBanner';
 import { useTick } from '../components/useTick';
 import { WeekStrip } from '../components/WeekStrip';
 
@@ -17,12 +18,16 @@ export function TodayScreen({
   data,
   onToggleRoutine,
   onToggleTask,
-  onSelectDay
+  onSelectDay,
+  onPickCard,
+  onCompleteCard
 }: {
   data: TodayView;
   onToggleRoutine: (routineId: string) => Promise<void>;
   onToggleTask: (task: GoalTask) => Promise<void>;
   onSelectDay: (day: ISODate | undefined) => void;
+  onPickCard: (weekId: ISODate, cardId: string) => Promise<void>;
+  onCompleteCard: (weekId: ISODate) => Promise<void>;
 }) {
   const [sections, setSections] = useState({ goals: true, routine: true, anytime: true });
   const [openGoals, setOpenGoals] = useState<Record<string, boolean>>({});
@@ -190,6 +195,14 @@ export function TodayScreen({
           </div>
         )}
 
+        {data.isToday && (
+          <WeeklyCardBanner
+            card={data.card}
+            onPick={(cardId) => onPickCard(data.card.weekId, cardId)}
+            onComplete={() => onCompleteCard(data.card.weekId)}
+          />
+        )}
+
         {data.goals.length > 0 && (
           <section className="content-block accordion-block">
             <AccordionHeader
@@ -274,6 +287,7 @@ export function TodayScreen({
                   todayKey={todayKey}
                   boundaryHour={data.dayBoundaryHour}
                   disabled={!data.editable}
+                  tier={data.tier}
                   onToggle={onToggleRoutine}
                 />
               ) : (

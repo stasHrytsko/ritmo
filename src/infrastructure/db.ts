@@ -10,7 +10,8 @@ import {
   type RoutineCompletion,
   type RoutinePlanRevision,
   type RoutineSnapshot,
-  type WeekRecord
+  type WeekRecord,
+  type WeeklyCardPick
 } from '../domain/types';
 
 const STORES = {
@@ -29,6 +30,8 @@ const STORES_V5 = {
   notes: 'id, createdAt, updatedAt',
   noteEntries: 'id, noteId, createdAt, updatedAt'
 };
+
+const STORES_V6 = { ...STORES_V5, weeklyCards: 'id, createdAt' };
 
 /** Shapes as they exist on disk mid-migration, before the current types apply. */
 interface StoredRoutine {
@@ -63,6 +66,7 @@ export class RitmoDatabase extends Dexie {
   goalTasks!: EntityTable<GoalTask, 'id'>;
   notes!: EntityTable<Note, 'id'>;
   noteEntries!: EntityTable<NoteEntry, 'id'>;
+  weeklyCards!: EntityTable<WeeklyCardPick, 'id'>;
   weeks!: EntityTable<WeekRecord, 'id'>;
   completions!: EntityTable<RoutineCompletion, 'id'>;
   settings!: EntityTable<AppSettings, 'key'>;
@@ -117,6 +121,11 @@ export class RitmoDatabase extends Dexie {
         delete note.completedAt;
       });
 
+      await bumpSchemaVersion(tx, 5);
+    });
+
+    // v6 added the weekly card sets. A new store only, so nothing to rewrite.
+    this.version(6).stores(STORES_V6).upgrade(async (tx) => {
       await bumpSchemaVersion(tx, SCHEMA_VERSION);
     });
   }

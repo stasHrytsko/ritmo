@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { GoalTask, ISODate } from '../domain/types';
 import { logicalDayKey, plural, toISODate } from '../domain/time';
 import { describeBackup, parseBackup } from '../domain/backup';
+import { tierOf } from '../domain/award';
 import { hasDayMedal } from '../domain/medal';
 import { repositories } from '../infrastructure/repositories';
 import {
@@ -267,6 +268,24 @@ export function App() {
     setSkippedAuth(true);
   };
 
+  const pickCard = async (weekId: ISODate, cardId: string) => {
+    try {
+      await service.pickWeeklyCard(weekId, cardId);
+    } catch (cause) {
+      setError(describeError(cause));
+    }
+    await refresh('day');
+  };
+
+  const completeCard = async (weekId: ISODate) => {
+    try {
+      await service.completeWeeklyCard(weekId);
+    } catch (cause) {
+      setError(describeError(cause));
+    }
+    await refresh('day');
+  };
+
   const exportBackup = async () => {
     try {
       const backup = await service.exportBackup();
@@ -381,6 +400,8 @@ export function App() {
             onToggleRoutine={toggleRoutine}
             onToggleTask={toggleTask}
             onSelectDay={selectDay}
+            onPickCard={pickCard}
+            onCompleteCard={completeCard}
           />
         )}
 
@@ -568,6 +589,7 @@ function withToggledRoutine(data: TodayView, routineId: string): TodayView {
     return { ...state, done, satisfied: state.scheduled ? done : true };
   });
   const medal = hasDayMedal(routines);
+  const tier = routines.length > 0 ? tierOf(dayProgress(routines)) : null;
   const dateKey = toISODate(data.date);
   // Closing or reopening today moves the run by one; the quiet reload that
   // follows confirms it from storage.
@@ -577,9 +599,10 @@ function withToggledRoutine(data: TodayView, routineId: string): TodayView {
     ...data,
     routines,
     medal,
+    tier,
     streak: { current, best: Math.max(data.streak.best, current) },
     week: data.week.map((day) =>
-      toISODate(day.date) === dateKey ? { ...day, medal, progress: dayProgress(routines) } : day
+      toISODate(day.date) === dateKey ? { ...day, medal, tier, progress: dayProgress(routines) } : day
     )
   };
 }

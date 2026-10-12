@@ -1,3 +1,4 @@
+import type { Tier } from '../../domain/award';
 /**
  * One vector tick everywhere, instead of the "✓" glyph each platform draws its
  * own way. Drawn as a stroke so it can animate on.
@@ -67,6 +68,16 @@ export function TrashMark() {
   return (
     <svg className="icon-line" viewBox="0 0 24 24" aria-hidden="true">
       <path d="M4 7h16M9 7V4.5h6V7M6.5 7l1 13h9l1-13" />
+    </svg>
+  );
+}
+
+/** Gold, silver or bronze: a solid disc in the medal's colour with a tick. */
+export function MedalMark({ tier, className = '' }: { tier: Tier; className?: string }) {
+  return (
+    <svg className={`icon-medal tier-${tier} ${className}`.trim()} viewBox="0 0 16 16" aria-hidden="true">
+      <circle cx="8" cy="8" r="7" />
+      <path d="M5 8.3l2 2 4-4.4" />
     </svg>
   );
 }

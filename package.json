@@ -10,6 +10,7 @@
     "typecheck": "tsc -b",
     "lint": "eslint .",
     "test": "vitest run",
+    "cards": "node scripts/build-cards.mjs",
     "check": "npm run lint && npm run typecheck && npm run test"
   },
   "dependencies": {

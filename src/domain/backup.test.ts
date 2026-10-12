@@ -155,3 +155,25 @@ describe('describeBackup', () => {
       .toBe('рутин: 1, целей: 1, заметок: 0, отметок: 1');
   });
 });
+
+describe('weekly cards in backups', () => {
+  it('reads a pre-v6 backup as having no card sets', () => {
+    const parsed = parseBackup({
+      schemaVersion: 5,
+      exportedAt: '2026-09-01T00:00:00Z',
+      routines: [], goals: [], goalTasks: [], weeks: [], completions: [], settings: [{ key: 'app' }]
+    });
+    expect(parsed.weeklyCards).toEqual([]);
+  });
+
+  it('keeps card sets from a v6 backup', () => {
+    const pick = { id: '2026-09-14', cardIds: ['easy:a', 'medium:b', 'hard:c'], createdAt: 'x' };
+    const parsed = parseBackup({
+      schemaVersion: 6,
+      exportedAt: '2026-09-01T00:00:00Z',
+      routines: [], goals: [], goalTasks: [], weeks: [], completions: [], settings: [{ key: 'app' }],
+      weeklyCards: [pick]
+    });
+    expect(parsed.weeklyCards).toEqual([pick]);
+  });
+});

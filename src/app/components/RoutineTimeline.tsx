@@ -3,7 +3,8 @@ import type { RoutineDayState } from '../../domain/medal';
 import { routineStatus, type RoutineStatus } from '../../domain/status';
 import type { ISODate } from '../../domain/types';
 import { minutesIntoDay, routineMinutes } from '../../domain/time';
-import { Check, Chevron } from './icons';
+import type { Tier } from '../../domain/award';
+import { Check, Chevron, MedalMark } from './icons';
 import { Collapse } from './Collapse';
 import { useTick } from './useTick';
 
@@ -56,6 +57,7 @@ export function RoutineTimeline({
   todayKey,
   boundaryHour,
   disabled = false,
+  tier = null,
   onToggle
 }: {
   items: RoutineDayState[];
@@ -63,6 +65,8 @@ export function RoutineTimeline({
   todayKey: ISODate;
   boundaryHour: number;
   disabled?: boolean;
+  /** The day's medal so far, shown on the counter. */
+  tier?: Tier | null;
   onToggle: (routineId: string) => void | Promise<void>;
 }) {
   const now = useNow();
@@ -136,7 +140,9 @@ export function RoutineTimeline({
         disabled={done.length === 0}
         onClick={() => setShowDone((current) => !current)}
       >
-        <span className="done-pill-mark"><Check /></span>
+        <span className={`done-pill-mark${tier ? ' has-tier' : ''}`}>
+          {tier ? <MedalMark tier={tier} /> : <Check />}
+        </span>
         <span>
           Выполнено
           <b key={done.length} className="done-pill-count">{done.length}/{items.length}</b>

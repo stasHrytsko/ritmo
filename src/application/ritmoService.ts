@@ -1,5 +1,6 @@
 import {
   SCHEMA_VERSION,
+  type CardTier,
   type ISODate,
   type Goal,
   type GoalTask,
@@ -11,7 +12,16 @@ import {
   type RoutineSnapshot,
   type WeekRecord
 } from '../domain/types';
+import { tierOf, type Tier } from '../domain/award';
 import { getRoutineDayStates, hasDayMedal, type RoutineDayState } from '../domain/medal';
+import {
+  cardById,
+  countDoneCards,
+  drawWeeklySet,
+  seenCardIds,
+  type CardCounts,
+  type WeeklyCard
+} from '../domain/weeklyCards';
 import { planForDate, routinesInWeek, withPlanRevision } from '../domain/plan';
 import { routineStatus, type RoutineStatus } from '../domain/status';
 import { streaks, type Streak } from '../domain/streak';
@@ -44,6 +54,8 @@ const now = () => new Date().toISOString();
 export interface DayStrip {
   date: Date;
   medal: boolean;
+  /** Gold/silver/bronze by the day's share done; null below half or when not lived. */
+  tier: Tier | null;
   isToday: boolean;
   future: boolean;
   /** Day on screen in Today; defaults to the current day. */
@@ -52,6 +64,19 @@ export interface DayStrip {
   progress: number;
   /** Lived with the app: false for days before tracking began. */
   tracked: boolean;
+}
+
+/**
+ * The week's card as the Today banner needs it. While a card is unchosen only
+ * its tier is exposed: the point is to pick blind.
+ */
+export interface WeeklyCardView {
+  weekId: ISODate;
+  /** Last day to finish it: the end of the calendar week. */
+  deadline: Date;
+  state: 'choose' | 'active' | 'done';
+  options: Array<{ id: string; tier: CardTier }>;
+  picked?: { card: WeeklyCard };
 }
 
 export interface TodayView {
@@ -64,6 +89,7 @@ export interface TodayView {
   editable: boolean;
   routines: RoutineDayState[];
   medal: boolean;
+  tier: Tier | null;
   week: DayStrip[];
   /**
    * Every active goal, so a goal is never out of sight just because nothing
@@ -76,6 +102,7 @@ export interface TodayView {
   weeksLeft: number;
   /** Share of the current year already lived, 0..1. */
   yearProgress: number;
+  card: WeeklyCardView;
   streak: Streak;
   /** Needed on screen to read clock times against the logical day. */
   dayBoundaryHour: number;
@@ -103,6 +130,8 @@ export interface WeekView {
   goalProgress: Array<{ goal: Goal; tasks: GoalTask[]; done: number; total: number }>;
   routineDone: number;
   routineTotal: number;
+  /** Medal for the week so far, from the same share the screen shows. */
+  tier: Tier | null;
   goalDone: number;
   goalTotal: number;
   tasks: Array<{ task: GoalTask; goal?: Goal }>;
@@ -113,6 +142,7 @@ export interface WeekView {
 export interface MonthDay {
   date: Date;
   medal: boolean;
+  tier: Tier | null;
   /** Tracked and already lived, today included. */
   known: boolean;
   future: boolean;
@@ -128,6 +158,7 @@ export interface MonthView {
   knownDays: number;
   /** Mean share done over the finished tracked days; null before there are any. */
   averageProgress: number | null;
+  tier: Tier | null;
   streak: Streak;
   goals: Array<{ goal: Goal; done: number; total: number }>;
 }
@@ -138,7 +169,18 @@ export interface YearView {
   weeksLeft: number;
   currentDay: number;
   totalDays: number;
-  months: Array<{ month: number; label: string; medals: number; knownDays: number }>;
+  months: Array<{
+    month: number;
+    label: string;
+    medals: number;
+    knownDays: number;
+    tier: Tier | null;
+  }>;
+  /** Mean share done over finished tracked days of the year; null before there are any. */
+  averageProgress: number | null;
+  tier: Tier | null;
+  /** Weekly cards finished, all time, per tier. */
+  cards: CardCounts;
 }
 
 export interface LifeView {
@@ -314,6 +356,7 @@ export class RitmoService {
       editable: dateKey <= todayKey,
       routines: states,
       medal: hasDayMedal(states),
+      tier: states.length > 0 ? tierOf(dayProgress(states)) : null,
       week: this.buildDayStrip(
         week,
         weekCompletions,
@@ -332,6 +375,7 @@ export class RitmoService {
       daysLeft: daysLeftInYear(today),
       weeksLeft: weeksLeftInYear(today),
       yearProgress: (dayOfYear(today) - 1) / daysInYear(today.getFullYear()),
+      card: await this.getWeeklyCard(week),
       streak: await this.getStreak(today),
       dayBoundaryHour: this.boundaryHour
     };
@@ -485,6 +529,7 @@ export class RitmoService {
       return {
         date: day,
         medal: tracked && hasDayMedal(states),
+        tier: tracked ? tierOf(dayProgress(states)) : null,
         isToday: key === todayKey,
         future,
         selected: key === selectedKey,
@@ -710,6 +755,10 @@ export class RitmoService {
       goalProgress,
       routineDone: routineProgress.reduce((sum, item) => sum + item.done, 0),
       routineTotal: routineProgress.reduce((sum, item) => sum + item.total, 0),
+      tier: tierOf(routineProgress.reduce((sum, item) => sum + item.total, 0) > 0
+        ? routineProgress.reduce((sum, item) => sum + item.done, 0)
+          / routineProgress.reduce((sum, item) => sum + item.total, 0)
+        : null),
       goalDone: goalProgress.reduce((sum, item) => sum + item.done, 0),
       goalTotal: goalProgress.reduce((sum, item) => sum + item.total, 0),
       tasks: tasks.map((task) => ({ task, goal: goalMap.get(task.goalId) })),
@@ -738,14 +787,20 @@ export class RitmoService {
       const week = weeks.find((item) => key >= item.startDate && key <= item.endDate);
       const base = { date: day, future: key > todayKey, isToday: key === todayKey };
       const tracked = week && trackedFrom !== undefined && key >= trackedFrom;
-      if (!tracked || key > todayKey) return { ...base, medal: false, known: false, progress: 0 };
+      if (!tracked || key > todayKey) return { ...base, medal: false, tier: null, known: false, progress: 0 };
 
       const states = getRoutineDayStates(
         planForDate(week, key),
         completions.filter((item) => item.date === key),
         day
       );
-      return { ...base, medal: hasDayMedal(states), known: true, progress: dayProgress(states) };
+      return {
+        ...base,
+        medal: hasDayMedal(states),
+        tier: tierOf(dayProgress(states)),
+        known: true,
+        progress: dayProgress(states)
+      };
     });
 
     const goals = await this.repos.goals.list();
@@ -753,15 +808,18 @@ export class RitmoService {
     // Today is still in progress, so it would only drag the average down.
     const finished = days.filter((day) => day.known && !day.isToday);
 
+    const averageProgress = finished.length
+      ? finished.reduce((sum, day) => sum + day.progress, 0) / finished.length
+      : null;
+
     return {
       date,
       name: monthName(date),
       days,
       medalCount: days.filter((day) => day.medal).length,
       knownDays: days.filter((day) => day.known).length,
-      averageProgress: finished.length
-        ? finished.reduce((sum, day) => sum + day.progress, 0) / finished.length
-        : null,
+      averageProgress,
+      tier: tierOf(averageProgress),
       streak: await this.getStreak(today),
       goals: goals.map((goal) => {
         const goalTasks = tasks.filter((task) => task.goalId === goal.id);
@@ -784,9 +842,14 @@ export class RitmoService {
     );
     const todayKey = toISODate(today);
 
+    let yearSum = 0;
+    let yearDays = 0;
+
     const months = Array.from({ length: 12 }, (_, month) => {
       let medals = 0;
       let knownDays = 0;
+      let sum = 0;
+      let finishedDays = 0;
 
       for (let day = 1; day <= daysInMonth(year, month); day += 1) {
         const current = new Date(year, month, day);
@@ -803,13 +866,21 @@ export class RitmoService {
           current
         );
         if (hasDayMedal(states)) medals += 1;
+        // Today is still in progress, so it would only drag the share down.
+        if (key < todayKey) {
+          sum += dayProgress(states);
+          finishedDays += 1;
+        }
       }
+      yearSum += sum;
+      yearDays += finishedDays;
 
       return {
         month,
         label: monthName(new Date(year, month, 1), 'short'),
         medals,
-        knownDays
+        knownDays,
+        tier: tierOf(finishedDays ? sum / finishedDays : null)
       };
     });
 
@@ -819,8 +890,49 @@ export class RitmoService {
       weeksLeft: weeksLeftInYear(today),
       currentDay: dayOfYear(today),
       totalDays: daysInYear(year),
-      months
+      months,
+      averageProgress: yearDays ? yearSum / yearDays : null,
+      tier: tierOf(yearDays ? yearSum / yearDays : null),
+      cards: countDoneCards(await this.repos.weeklyCards.list())
     };
+  }
+
+  /** Draws the week's three cards the first time they are asked for, then keeps them. */
+  private async getWeeklyCard(week: WeekRecord): Promise<WeeklyCardView> {
+    let pick = await this.repos.weeklyCards.get(week.id);
+    if (!pick) {
+      pick = {
+        id: week.id,
+        cardIds: drawWeeklySet(seenCardIds(await this.repos.weeklyCards.list())),
+        createdAt: now()
+      };
+      await this.repos.weeklyCards.put(pick);
+    }
+
+    const picked = pick.pickedId ? cardById(pick.pickedId) : undefined;
+    return {
+      weekId: week.id,
+      deadline: fromISODate(week.endDate),
+      state: !picked ? 'choose' : pick.doneAt ? 'done' : 'active',
+      options: pick.cardIds.flatMap((cardId) => {
+        const card = cardById(cardId);
+        return card ? [{ id: card.id, tier: card.tier }] : [];
+      }),
+      picked: picked ? { card: picked } : undefined
+    };
+  }
+
+  /** Opens one of the week's three cards. One pick per week; it cannot be changed. */
+  async pickWeeklyCard(weekId: ISODate, cardId: string) {
+    const pick = await this.repos.weeklyCards.get(weekId);
+    if (!pick || pick.pickedId || !pick.cardIds.includes(cardId)) return;
+    await this.repos.weeklyCards.put({ ...pick, pickedId: cardId, pickedAt: now() });
+  }
+
+  async completeWeeklyCard(weekId: ISODate) {
+    const pick = await this.repos.weeklyCards.get(weekId);
+    if (!pick || !pick.pickedId || pick.doneAt) return;
+    await this.repos.weeklyCards.put({ ...pick, doneAt: now() });
   }
 
   async getLife(): Promise<LifeView> {

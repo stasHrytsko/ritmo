@@ -2,8 +2,8 @@ export type ISODate = string;
 export type GoalStatus = 'active' | 'paused' | 'done';
 export type RoutineTiming = 'exact' | 'anytime';
 
-export const SCHEMA_VERSION = 5;
-export const SUPPORTED_SCHEMA_VERSIONS = [1, 2, 3, 4, 5];
+export const SCHEMA_VERSION = 6;
+export const SUPPORTED_SCHEMA_VERSIONS = [1, 2, 3, 4, 5, 6];
 
 export interface Routine {
   id: string;
@@ -100,6 +100,22 @@ export interface WeekRecord {
   closedAt?: string;
 }
 
+export type CardTier = 'easy' | 'medium' | 'hard';
+
+/**
+ * The week's set of three cards, drawn once and kept, so every device and every
+ * reopening shows the same three. Id is the week's start date.
+ */
+export interface WeeklyCardPick {
+  id: ISODate;
+  /** One card per tier, in easy / medium / hard order. */
+  cardIds: string[];
+  pickedId?: string;
+  pickedAt?: string;
+  doneAt?: string;
+  createdAt: string;
+}
+
 export interface AppSettings {
   key: 'app';
   schemaVersion: number;
@@ -118,5 +134,6 @@ export interface BackupPayload {
   completions: RoutineCompletion[];
   notes: Note[];
   noteEntries: NoteEntry[];
+  weeklyCards: WeeklyCardPick[];
   settings: AppSettings[];
 }

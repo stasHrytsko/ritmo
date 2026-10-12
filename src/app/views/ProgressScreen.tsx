@@ -1,5 +1,8 @@
 import type { MonthView, WeekDayProgress, WeekView, YearView } from '../../application/ritmoService';
+import { TIER_LABELS, type Tier } from '../../domain/award';
+import { MedalMark } from '../components/icons';
 import { WEEKDAY_LETTERS, isoWeekday, plural, routineMinutes } from '../../domain/time';
+import { CARD_TIER_PLURALS, CARD_TIERS } from '../../domain/weeklyCards';
 import { Empty, PeriodSwitch, ProgressBar, ProgressSummary, SectionHeader, type PeriodView } from '../components/ui';
 
 export type ProgressData =
@@ -40,7 +43,7 @@ function WeekBody({ data, onChange }: { data: WeekView; onChange: (view: PeriodV
       <div className="week-summary">
         <div className="week-summary-copy">
           <span className="summary-label">Рутина</span>
-          <strong>{percent}%</strong>
+          <strong>{percent}%{data.tier && <TierBadge tier={data.tier} />}</strong>
           <small>{data.routineDone} из {data.routineTotal} · только прожитые дни</small>
         </div>
         <div className="day-bars" aria-hidden="true">
@@ -177,7 +180,10 @@ function MonthBody({ data, onChange }: { data: MonthView; onChange: (view: Perio
         </div>
         <div className="summary-card">
           <span>Средний день</span>
-          <strong>{data.averageProgress === null ? '—' : `${Math.round(data.averageProgress * 100)}%`}</strong>
+          <strong>
+            {data.averageProgress === null ? '—' : `${Math.round(data.averageProgress * 100)}%`}
+            {data.tier && <TierBadge tier={data.tier} />}
+          </strong>
           <small>медалей: {data.medalCount} из {data.knownDays}</small>
         </div>
       </div>
@@ -193,11 +199,11 @@ function MonthBody({ data, onChange }: { data: MonthView; onChange: (view: Perio
           const state = day.future ? 'future' : !day.known ? 'untracked' : day.medal ? 'medal' : 'partial';
           return (
             <div
-              className={`month-day is-${state}${day.isToday ? ' is-today' : ''}`}
+              className={`month-day is-${state}${day.tier ? ` tier-${day.tier}` : ''}${day.isToday ? ' is-today' : ''}`}
               key={day.date.toISOString()}
               aria-label={monthDayLabel(day)}
             >
-              {state === 'partial' && (
+              {state === 'partial' && !day.tier && (
                 <i className="month-fill" style={{ height: `${Math.round(day.progress * 100)}%` }} />
               )}
               <span>{day.date.getDate()}</span>
@@ -206,8 +212,10 @@ function MonthBody({ data, onChange }: { data: MonthView; onChange: (view: Perio
         })}
       </div>
       <div className="legend">
-        <span><i className="month-day is-medal" />медаль</span>
-        <span><i className="month-day is-partial"><i className="month-fill" style={{ height: '55%' }} /></i>частично</span>
+        <span><i className="month-day is-medal tier-gold" />золото</span>
+        <span><i className="month-day is-partial tier-silver" />серебро</span>
+        <span><i className="month-day is-partial tier-bronze" />бронза</span>
+        <span><i className="month-day is-partial"><i className="month-fill" style={{ height: '30%' }} /></i>меньше половины</span>
         <span><i className="month-day is-future" />впереди</span>
         <span><i className="month-day is-untracked" />не отмечалось</span>
       </div>
@@ -236,7 +244,7 @@ function monthDayLabel(day: MonthView['days'][number]) {
   const date = day.date.getDate();
   if (day.future) return `${date}: ещё впереди`;
   if (!day.known) return `${date}: не отмечалось`;
-  if (day.medal) return `${date}: медаль`;
+  if (day.tier) return `${date}: ${TIER_LABELS[day.tier].toLowerCase()}, ${Math.round(day.progress * 100)}%`;
   return `${date}: ${Math.round(day.progress * 100)}%`;
 }
 
@@ -255,16 +263,32 @@ function YearBody({ data, onChange }: { data: YearView; onChange: (view: PeriodV
 
       <div className="summary-grid">
         <div className="summary-card">
-          <span>Осталось дней</span>
-          <strong>{data.daysLeft}</strong>
-          <small>до конца года</small>
+          <span>Медаль года</span>
+          <strong>
+            {data.averageProgress === null ? '—' : `${Math.round(data.averageProgress * 100)}%`}
+            {data.tier && <TierBadge tier={data.tier} />}
+          </strong>
+          <small>средний день года</small>
         </div>
         <div className="summary-card">
-          <span>Осталось недель</span>
-          <strong>{data.weeksLeft}</strong>
-          <small>примерно</small>
+          <span>Осталось дней</span>
+          <strong>{data.daysLeft}</strong>
+          <small>≈ {data.weeksLeft} нед. до конца года</small>
         </div>
       </div>
+
+      <section className="card-counters">
+        <SectionHeader title="Карты недели" meta="" />
+        <div className="summary-grid three-up">
+          {CARD_TIERS.map((tier) => (
+            <div className={`summary-card tier-${tier}`} key={tier}>
+              <span>{CARD_TIER_PLURALS[tier]}</span>
+              <strong>{data.cards[tier]}</strong>
+              <small>{plural(data.cards[tier], ['закрыта', 'закрыты', 'закрыто'])}</small>
+            </div>
+          ))}
+        </div>
+      </section>
 
       <div className="quarters-list">
         {[0, 1, 2, 3].map((quarterIndex) => {
@@ -284,7 +308,7 @@ function YearBody({ data, onChange }: { data: YearView; onChange: (view: PeriodV
                 </div>
                 <div className="quarter-meta">
                   <b>{medals}</b>
-                  <span>{plural(medals, ['медаль', 'медали', 'медалей'])}</span>
+                  <span>{plural(medals, ['золото', 'золота', 'золота'])}</span>
                 </div>
               </div>
 
@@ -292,7 +316,10 @@ function YearBody({ data, onChange }: { data: YearView; onChange: (view: PeriodV
                 {months.map((month) => (
                   <div className="month-card" key={month.month}>
                     <strong>{month.label.toUpperCase()}</strong>
-                    <span>{month.medals} {plural(month.medals, ['медаль', 'медали', 'медалей'])}</span>
+                    <span>
+                      {month.tier ? <MedalMark tier={month.tier} className="inline" /> : null}
+                      {month.medals} {plural(month.medals, ['золото', 'золота', 'золота'])}
+                    </span>
                     <div className="month-bar">
                       <i style={{
                         width: `${month.knownDays ? Math.round((month.medals / month.knownDays) * 100) : 0}%`
@@ -314,5 +341,14 @@ function YearBody({ data, onChange }: { data: YearView; onChange: (view: PeriodV
         })}
       </div>
     </>
+  );
+}
+
+function TierBadge({ tier }: { tier: Tier }) {
+  return (
+    <span className={`tier-badge tier-${tier}`}>
+      <MedalMark tier={tier} />
+      {TIER_LABELS[tier]}
+    </span>
   );
 }
