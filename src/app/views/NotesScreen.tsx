@@ -393,7 +393,9 @@ function EntrySheet({
       )}
 
       {step === 'edit' && (
-        <input
+        <textarea
+          className="entry-textarea"
+          rows={6}
           value={text}
           aria-label="Текст записи"
           onChange={(event) => setText(event.target.value)}

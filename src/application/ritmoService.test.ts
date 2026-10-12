@@ -385,6 +385,11 @@ describe('turning an entry into something', () => {
     return store.noteEntries[0];
   };
 
+  it('names a goal after the first line of a multi-line entry', async () => {
+    await service.entryToGoal(await entryFor('Repaint the hallway\nGrey, two coats'), '2026-10-01', '2026-12-31');
+    expect(store.goals[0].name).toBe('Repaint the hallway');
+  });
+
   it('creates an active goal from the entry text and dates', async () => {
     await service.entryToGoal(await entryFor('Repaint the hallway'), '2026-10-01', '2026-12-31');
 

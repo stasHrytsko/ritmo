@@ -204,6 +204,9 @@ export interface NotesView {
   goals: Pick<Goal, 'id' | 'name'>[];
 }
 
+/** An entry may run to several lines; the first one names what it becomes. */
+const firstLine = (text: string) => text.split('\n')[0].trim();
+
 export class RitmoService {
   private booting?: Promise<void>;
   private boundaryHour = 3;
@@ -681,13 +684,13 @@ export class RitmoService {
    * backlog shows what has already been acted on.
    */
   async entryToGoal(entry: NoteEntry, startDate: string, endDate: string) {
-    await this.createGoal(entry.text, startDate, endDate);
+    await this.createGoal(firstLine(entry.text), startDate, endDate);
     await this.markEntry(entry, 'goal');
   }
 
   /** Files an entry as a task of an existing goal, planned for this week. */
   async entryToGoalTask(entry: NoteEntry, goalId: string) {
-    await this.addGoalTask(goalId, entry.text);
+    await this.addGoalTask(goalId, firstLine(entry.text));
     await this.markEntry(entry, 'task');
   }
 
@@ -698,7 +701,7 @@ export class RitmoService {
     timing: Routine['timing'],
     time?: string
   ) {
-    await this.createRoutine(entry.text, weekdays, timing, time);
+    await this.createRoutine(firstLine(entry.text), weekdays, timing, time);
     await this.markEntry(entry, 'routine');
   }
 

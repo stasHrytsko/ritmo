@@ -2388,6 +2388,25 @@ input {
 .note-entry span {
   min-width: 0;
   overflow-wrap: anywhere;
+  white-space: pre-line;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.entry-textarea {
+  width: 100%;
+  min-height: 140px;
+  padding: 12px 14px;
+  border: 0;
+  border-radius: 14px;
+  background: var(--row);
+  color: var(--ink);
+  font: inherit;
+  font-size: 16px;
+  line-height: 1.4;
+  resize: none;
 }
 
 .note-entry i {
@@ -4234,6 +4253,7 @@ input {
   font-size: 15px;
   color: var(--muted);
   overflow-wrap: anywhere;
+  white-space: pre-line;
   display: -webkit-box;
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
