@@ -1,19 +1,18 @@
 import { AuthForm } from '../components/CloudPanel';
 
-/** First-run entry: sign in or register with an email code, or stay local-only. */
-export function WelcomeScreen({ onSkip }: { onSkip: () => void }) {
+/** Entry to the app: sign in or create an account with an email code. */
+export function WelcomeScreen() {
   return (
     <div className="app-shell welcome">
       <h1 className="brand">Ritmo<span>.</span></h1>
-      <p className="welcome-lead">Рутины, цели и заметки — в одном ритме. Войдите или создайте аккаунт, чтобы данные были в облаке и на всех ваших устройствах.</p>
+      <p className="welcome-lead">
+        Рутины, цели и заметки — в одном ритме. Войдите или создайте аккаунт: у каждого свой личный список, он сохраняется в облаке и доступен на всех ваших устройствах.
+      </p>
       <AuthForm
         className="cloud-panel welcome-form"
         showTitle={false}
         intro="Введите email — мы пришлём код. Если аккаунта ещё нет, он создастся автоматически."
       />
-      <button type="button" className="welcome-skip" onClick={onSkip}>
-        Продолжить без аккаунта
-      </button>
     </div>
   );
 }

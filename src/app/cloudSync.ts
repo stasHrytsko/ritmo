@@ -170,7 +170,6 @@ export function useCloudSync({ exportBackup, importBackup, resetLocal, onPulled 
     try {
       await signOut();
       await resetLocal();
-      try { localStorage.removeItem('ritmo.skipAuth'); } catch { /* storage unavailable */ }
     } finally {
       window.location.reload();
     }

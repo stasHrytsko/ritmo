@@ -261,14 +261,6 @@ export function App() {
     onPulled: useCallback(() => { void service.init().then(() => refresh(viewRef.current)); }, [service, refresh])
   });
 
-  const [skippedAuth, setSkippedAuth] = useState(() => {
-    try { return localStorage.getItem('ritmo.skipAuth') === '1'; } catch { return false; }
-  });
-  const skipAuth = () => {
-    try { localStorage.setItem('ritmo.skipAuth', '1'); } catch { /* storage unavailable */ }
-    setSkippedAuth(true);
-  };
-
   const pickCard = async (weekId: ISODate, cardId: string) => {
     try {
       await service.pickWeeklyCard(weekId, cardId);
@@ -333,9 +325,8 @@ export function App() {
   };
 
   if (cloudConfigured && !cloud.ready) return null;
-  if (cloudConfigured && !cloud.session && !skippedAuth) {
-    return <WelcomeScreen onSkip={skipAuth} />;
-  }
+  // No account, no app: everything in Ritmo belongs to a signed-in account.
+  if (cloudConfigured && !cloud.session) return <WelcomeScreen />;
 
   const shown = screen && pendingDelete ? withoutIds(screen, pendingDelete.ids) : screen;
 

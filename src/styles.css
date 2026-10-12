@@ -3095,16 +3095,6 @@ input {
   padding: 0;
 }
 
-.welcome-skip {
-  justify-self: center;
-  background: none;
-  border: 0;
-  color: inherit;
-  opacity: 0.7;
-  text-decoration: underline;
-  font: inherit;
-}
-
 .cloud-panel input {
   border-color: var(--line-strong);
   background: var(--surface);
