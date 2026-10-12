@@ -5,14 +5,9 @@ export function WelcomeScreen() {
   return (
     <div className="app-shell welcome">
       <h1 className="brand">Ritmo<span>.</span></h1>
-      <p className="welcome-lead">
-        Рутины, цели и заметки — в одном ритме. Войдите или создайте аккаунт: у каждого свой личный список, он сохраняется в облаке и доступен на всех ваших устройствах.
-      </p>
-      <AuthForm
-        className="cloud-panel welcome-form"
-        showTitle={false}
-        intro="Введите email — мы пришлём код. Если аккаунта ещё нет, он создастся автоматически."
-      />
+      <h2 className="welcome-title">Свой ритм каждый день</h2>
+      <p className="welcome-lead">Рутины, цели и заметки в одном месте. Всё только ваше и всегда с вами.</p>
+      <AuthForm className="cloud-panel welcome-form" showTitle={false} />
     </div>
   );
 }

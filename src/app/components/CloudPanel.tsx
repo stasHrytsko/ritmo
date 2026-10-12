@@ -61,13 +61,13 @@ export function AuthForm({
         {showTitle && <strong>Облако</strong>}
         <span>
           {sent
-            ? `Мы отправили код на ${email}. Введите его — или откройте ссылку из письма.`
-            : intro ?? 'Войдите по email, чтобы хранить данные в облаке и открывать их на любом устройстве. Новый аккаунт создастся сам.'}
+            ? `Код ушёл на ${email}. Введите его ниже.`
+            : intro ?? 'Введите почту, мы пришлём код. Пароль не нужен.'}
         </span>
       </div>
       <input
         autoComplete="name"
-        placeholder="Имя (для нового аккаунта)"
+        placeholder="Как вас зовут (необязательно)"
         value={name}
         disabled={sent || busy}
         onChange={(event) => setName(event.target.value)}
@@ -76,7 +76,7 @@ export function AuthForm({
         type="email"
         inputMode="email"
         autoComplete="email"
-        placeholder="Email"
+        placeholder="Почта"
         value={email}
         disabled={sent || busy}
         onChange={(event) => setEmail(event.target.value)}
@@ -95,7 +95,7 @@ export function AuthForm({
       {error && <span role="alert" className="cloud-error">{error}</span>}
       <div className="backup-actions">
         <button type="submit" className="primary" disabled={busy}>{sent ? 'Войти' : 'Получить код'}</button>
-        {sent && <button type="button" onClick={() => { setSent(false); setCode(''); }}>Другой email</button>}
+        {sent && <button type="button" onClick={() => { setSent(false); setCode(''); }}>Другая почта</button>}
       </div>
     </form>
   );

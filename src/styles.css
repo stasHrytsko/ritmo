@@ -3084,6 +3084,13 @@ input {
   margin: 0;
 }
 
+.welcome-title {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -.02em;
+}
+
 .welcome-lead {
   margin: 0;
   opacity: 0.8;
