@@ -36,7 +36,8 @@ describe('drawCard', () => {
 
   it('starts over once every card was seen', () => {
     const seen = new Set(WEEKLY_CARDS.map((card) => card.id));
-    expect(WEEKLY_CARDS.some((card) => card.id === drawCard(seen))).toBe(true);
+    const drawn = drawCard(seen);
+    expect(WEEKLY_CARDS.some((card) => card.id === drawn)).toBe(true);
   });
 });
 

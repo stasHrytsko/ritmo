@@ -64,6 +64,22 @@ export function RoutineMark() {
   );
 }
 
+export function EditMark() {
+  return (
+    <svg className="icon-line" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M4 20h4L19 9l-4-4L4 16v4zM13.5 6.5l4 4" />
+    </svg>
+  );
+}
+
+export function FolderMark() {
+  return (
+    <svg className="icon-line" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M3.5 7.5v10a1.5 1.5 0 0 0 1.5 1.5h14a1.5 1.5 0 0 0 1.5-1.5V9.5A1.5 1.5 0 0 0 19 8h-7L10 5.5H5A1.5 1.5 0 0 0 3.5 7z" />
+    </svg>
+  );
+}
+
 export function TrashMark() {
   return (
     <svg className="icon-line" viewBox="0 0 24 24" aria-hidden="true">

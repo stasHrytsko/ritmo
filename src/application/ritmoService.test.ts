@@ -325,6 +325,16 @@ describe('notes', () => {
     expect(store.noteEntries[0].text).toBe('Fix the kitchen tap');
   });
 
+  it('moves an entry to another note', async () => {
+    const home = await addNote('Home');
+    const work = await addNote('Work');
+    await service.addNoteEntry(home.id, 'Fix the tap');
+
+    await service.moveNoteEntry(store.noteEntries[0], work.id);
+    expect(store.noteEntries[0].noteId).toBe(work.id);
+    expect(store.noteEntries[0].text).toBe('Fix the tap');
+  });
+
   it('deletes an entry without touching its neighbours', async () => {
     const note = await addNote('Home');
     await service.addNoteEntry(note.id, 'Fix the tap');

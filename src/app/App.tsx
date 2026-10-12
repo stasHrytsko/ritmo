@@ -471,6 +471,10 @@ export function App() {
               await service.updateNoteEntry(entry, text);
               await refresh('notes');
             }}
+            onMoveEntry={async (entry, noteId) => {
+              await service.moveNoteEntry(entry, noteId);
+              await refresh('notes');
+            }}
             onDeleteEntry={async (entryId) => {
               await scheduleDelete('Запись удалена', [entryId], () => service.deleteNoteEntry(entryId));
             }}

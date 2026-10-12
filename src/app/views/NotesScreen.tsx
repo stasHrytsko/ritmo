@@ -5,7 +5,7 @@ import { guessRoutine } from '../../domain/entryGuess';
 import { addDays, plural, toISODate } from '../../domain/time';
 import { Collapse } from '../components/Collapse';
 import { EditorSheet } from '../components/EditorSheet';
-import { Chevron, GoalMark, RoutineMark, TaskMark, TrashMark } from '../components/icons';
+import { Chevron, EditMark, FolderMark, GoalMark, RoutineMark, TaskMark, TrashMark } from '../components/icons';
 import { Empty } from '../components/ui';
 
 type Sheet =
@@ -32,6 +32,7 @@ export function NotesScreen({
   onDeleteNote,
   onAddEntry,
   onUpdateEntry,
+  onMoveEntry,
   onDeleteEntry,
   onConvertEntry
 }: {
@@ -41,6 +42,7 @@ export function NotesScreen({
   onDeleteNote: (noteId: string) => Promise<void>;
   onAddEntry: (noteId: string, text: string) => Promise<void>;
   onUpdateEntry: (entry: NoteEntry, text: string) => Promise<void>;
+  onMoveEntry: (entry: NoteEntry, noteId: string) => Promise<void>;
   onDeleteEntry: (entryId: string) => Promise<void>;
   onConvertEntry: (entry: NoteEntry, text: string, target: EntryTarget) => Promise<void>;
 }) {
@@ -189,8 +191,10 @@ export function NotesScreen({
         <EntrySheet
           entry={sheet.entry}
           goals={data.goals}
+          folders={data.notes.map(({ note }) => note)}
           onClose={() => setSheet(null)}
           onUpdate={onUpdateEntry}
+          onMove={onMoveEntry}
           onDelete={onDeleteEntry}
           onConvert={async (text, target) => {
             await onConvertEntry(sheet.entry, text, target);
@@ -267,6 +271,8 @@ const WEEKDAYS = [
 const shortDate = (date: Date) =>
   new Intl.DateTimeFormat('ru', { day: 'numeric', month: 'short' }).format(date).replace('.', '');
 
+type Step = 'menu' | 'edit' | 'move' | EntryTarget['kind'];
+
 const CREATE_LABELS: Record<EntryTarget['kind'], string> = {
   goal: 'Создать цель',
   task: 'Добавить в цель',
@@ -276,20 +282,26 @@ const CREATE_LABELS: Record<EntryTarget['kind'], string> = {
 function EntrySheet({
   entry,
   goals,
+  folders,
   onClose,
   onUpdate,
+  onMove,
   onDelete,
   onConvert
 }: {
   entry: NoteEntry;
   goals: NotesView['goals'];
+  folders: Note[];
   onClose: () => void;
   onUpdate: (entry: NoteEntry, text: string) => Promise<void>;
+  onMove: (entry: NoteEntry, noteId: string) => Promise<void>;
   onDelete: (entryId: string) => Promise<void>;
   onConvert: (text: string, target: EntryTarget) => Promise<void>;
 }) {
   const [text, setText] = useState(entry.text);
-  const [kind, setKind] = useState<EntryTarget['kind'] | null>(null);
+  // What the sheet shows: the action menu, or one action's own step.
+  const [step, setStep] = useState<Step>('menu');
+  const kind = step === 'goal' || step === 'task' || step === 'routine' ? step : null;
   const [span, setSpan] = useState(1);
   const [goalId, setGoalId] = useState(goals[0]?.id);
   const [guess] = useState(() => guessRoutine(entry.text));
@@ -331,45 +343,81 @@ function EntrySheet({
     }
   };
 
-  const tiles: Array<{ value: EntryTarget['kind']; label: string; icon: ReactNode; disabled?: boolean }> = [
-    { value: 'goal', label: 'Цель', icon: <GoalMark /> },
-    { value: 'task', label: 'Задача', icon: <TaskMark />, disabled: goals.length === 0 },
-    { value: 'routine', label: 'Рутина', icon: <RoutineMark /> }
+  const actions: Array<{ step: Step; label: string; icon: ReactNode; disabled?: boolean }> = [
+    { step: 'edit', label: 'Редактировать', icon: <EditMark /> },
+    { step: 'goal', label: 'Создать как цель', icon: <GoalMark /> },
+    { step: 'task', label: 'Создать как задачу', icon: <TaskMark />, disabled: goals.length === 0 },
+    { step: 'routine', label: 'Создать как рутину', icon: <RoutineMark /> },
+    { step: 'move', label: 'Переместить в папку', icon: <FolderMark />, disabled: folders.length < 2 }
   ];
+
+  const move = async (noteId: string) => {
+    await onMove(entry, noteId);
+    onClose();
+  };
 
   return (
     <EditorSheet title="Запись" onClose={close}>
-      <div className="entry-edit">
+      {step === 'menu' ? (
+        <>
+          <p className="entry-preview">{entry.text}</p>
+          <div className="menu-list" role="menu">
+            {actions.map((action) => (
+              <button
+                type="button"
+                role="menuitem"
+                key={action.step}
+                className="menu-row"
+                disabled={action.disabled}
+                onClick={() => setStep(action.step)}
+              >
+                {action.icon}
+                {action.label}
+              </button>
+            ))}
+            <button
+              type="button"
+              role="menuitem"
+              className="menu-row is-danger"
+              onClick={() => void onDelete(entry.id).then(onClose)}
+            >
+              <TrashMark />
+              Удалить
+            </button>
+          </div>
+        </>
+      ) : (
+        <button type="button" className="sheet-back" onClick={() => setStep('menu')}>
+          ‹ Назад
+        </button>
+      )}
+
+      {step === 'edit' && (
         <input
           value={text}
           aria-label="Текст записи"
           onChange={(event) => setText(event.target.value)}
         />
-        <button
-          type="button"
-          className="icon-button danger"
-          aria-label="Удалить запись"
-          onClick={() => void onDelete(entry.id).then(onClose)}
-        >
-          <TrashMark />
-        </button>
-      </div>
+      )}
 
-      <div className="make-tiles" role="group" aria-label="Сделать из записи">
-        {tiles.map((tile) => (
-          <button
-            type="button"
-            key={tile.value}
-            className="make-tile"
-            aria-pressed={kind === tile.value}
-            disabled={tile.disabled}
-            onClick={() => setKind(tile.value)}
-          >
-            {tile.icon}
-            {tile.label}
-          </button>
-        ))}
-      </div>
+      {step === 'move' && (
+        <div className="menu-list" role="menu" aria-label="Переместить в папку">
+          {folders.map((folder) => (
+            <button
+              type="button"
+              role="menuitem"
+              key={folder.id}
+              className="menu-row"
+              disabled={folder.id === entry.noteId}
+              onClick={() => void move(folder.id)}
+            >
+              <FolderMark />
+              {folder.title}
+              {folder.id === entry.noteId && <small>здесь</small>}
+            </button>
+          ))}
+        </div>
+      )}
 
       <Collapse open={kind === 'goal'}>
         <div className="make-options">

@@ -666,6 +666,12 @@ export class RitmoService {
     await this.repos.noteEntries.update({ ...entry, text: trimmed, updatedAt: now() });
   }
 
+  /** Files an entry under another note. */
+  async moveNoteEntry(entry: NoteEntry, noteId: string) {
+    if (noteId === entry.noteId) return;
+    await this.repos.noteEntries.update({ ...entry, noteId, updatedAt: now() });
+  }
+
   async deleteNoteEntry(entryId: string) {
     await this.repos.noteEntries.remove(entryId);
   }
