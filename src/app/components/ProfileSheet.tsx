@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import {
   changeEmail,
@@ -6,22 +6,15 @@ import {
   profileOf,
   saveProfile,
   AVATARS,
-  type AvatarKind,
-  type ReminderMode
+  type AvatarKind
 } from '../../infrastructure/cloud';
 import type { SyncStatus } from '../cloudSync';
+import type { BeforeInstallPromptEvent } from '../views/LifeScreen';
 import { Avatar } from './Avatar';
 import { AuthForm } from './CloudPanel';
-import { Chevron } from './icons';
-import { Collapse } from './Collapse';
 import { EditorSheet } from './EditorSheet';
-
-const REMINDERS: { value: ReminderMode; label: string; hint: string }[] = [
-  { value: 'off', label: 'Выключено', hint: 'Без напоминаний' },
-  { value: 'morning', label: 'Утром', hint: 'Раз в день — перед первым действием в графике' },
-  { value: 'evening', label: 'Вечером', hint: 'Раз в день — перед последним действием в графике' },
-  { value: 'each', label: 'Каждое действие', hint: 'Перед каждым действием из графика' }
-];
+import { ChevronRight } from './icons';
+import { ThemePicker } from './ThemePicker';
 
 const STATUS: Record<SyncStatus, string> = {
   off: '',
@@ -31,27 +24,30 @@ const STATUS: Record<SyncStatus, string> = {
   error: 'Не удалось синхронизировать'
 };
 
+interface Actions {
+  onSync: () => void;
+  onSignOut: () => void;
+  onExport: () => void;
+  onImport: (file?: File) => void;
+  installPrompt: BeforeInstallPromptEvent | null;
+  onInstall: () => void;
+  onClose: () => void;
+}
+
+/** Everything about me and the app in one place: profile, look, data, account. */
 export function ProfileSheet({
   session,
   status,
-  onSync,
-  onSignOut,
-  onClose
-}: {
-  session: Session | null;
-  status: SyncStatus;
-  onSync: () => void;
-  onSignOut: () => void;
-  onClose: () => void;
-}) {
+  ...actions
+}: { session: Session | null; status: SyncStatus } & Actions) {
   if (!session) {
     return (
-      <EditorSheet title="Профиль" onClose={onClose}>
+      <EditorSheet title="Профиль" onClose={actions.onClose}>
         <AuthForm showTitle={false} intro="Войдите, чтобы хранить данные в облаке. Новый аккаунт создастся сам." />
       </EditorSheet>
     );
   }
-  return <SignedIn session={session} status={status} onSync={onSync} onSignOut={onSignOut} onClose={onClose} />;
+  return <SignedIn session={session} status={status} {...actions} />;
 }
 
 function SignedIn({
@@ -59,37 +55,37 @@ function SignedIn({
   status,
   onSync,
   onSignOut,
+  onExport,
+  onImport,
+  installPrompt,
+  onInstall,
   onClose
-}: {
-  session: Session;
-  status: SyncStatus;
-  onSync: () => void;
-  onSignOut: () => void;
-  onClose: () => void;
-}) {
+}: { session: Session; status: SyncStatus } & Actions) {
   const initial = profileOf(session);
   const [name, setName] = useState(initial.name);
   const [avatar, setAvatar] = useState<AvatarKind>(initial.avatar);
-  const [reminder, setReminder] = useState<ReminderMode>(initial.reminder);
-  const [remindersOpen, setRemindersOpen] = useState(false);
   const [email, setEmail] = useState(session.user.email ?? '');
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const importRef = useRef<HTMLInputElement>(null);
+
+  const dirty = name.trim() !== initial.name || avatar !== initial.avatar
+    || email.trim() !== (session.user.email ?? '');
 
   const save = async () => {
     setBusy(true);
     setError(null);
     setNote(null);
     try {
-      await saveProfile({ name: name.trim(), avatar, reminder });
+      await saveProfile({ name: name.trim(), avatar, reminder: initial.reminder });
       const nextEmail = email.trim();
       if (nextEmail && nextEmail !== session.user.email) {
         await changeEmail(nextEmail);
         setNote(`Мы отправили письмо на ${nextEmail}. Почта сменится после подтверждения.`);
         setEmail(session.user.email ?? '');
       } else {
-        onClose();
+        setNote('Сохранено');
       }
     } catch (cause) {
       setError(describeAuthError(cause));
@@ -97,6 +93,8 @@ function SignedIn({
       setBusy(false);
     }
   };
+
+  const showInstall = Boolean(installPrompt) || (isIOS() && !isStandalone());
 
   return (
     <EditorSheet title="Профиль" onClose={onClose}>
@@ -132,52 +130,75 @@ function SignedIn({
           <input type="email" autoComplete="email" required value={email} onChange={(event) => setEmail(event.target.value)} />
         </label>
 
-        <div className="profile-reminders">
-          <button
-            type="button"
-            className="profile-reminders-toggle"
-            aria-expanded={remindersOpen}
-            onClick={() => setRemindersOpen((current) => !current)}
-          >
-            <span>
-              <small>Напоминание</small>
-              <strong>{REMINDERS.find((option) => option.value === reminder)?.label}</strong>
-            </span>
-            <Chevron />
-          </button>
-          <Collapse open={remindersOpen}>
-            <div className="profile-reminder-options" role="radiogroup" aria-label="Напоминание">
-              {REMINDERS.map((option) => (
-                <label key={option.value} className={reminder === option.value ? 'selected' : ''}>
-                  <input
-                    type="radio"
-                    name="reminder"
-                    checked={reminder === option.value}
-                    onChange={() => {
-                      setReminder(option.value);
-                      setRemindersOpen(false);
-                    }}
-                  />
-                  <span><strong>{option.label}</strong><small>{option.hint}</small></span>
-                </label>
-              ))}
-            </div>
-          </Collapse>
-        </div>
-
         {error && <span role="alert" className="cloud-error">{error}</span>}
         {note && <span className="profile-note">{note}</span>}
-
-        <div className="backup-actions">
-          <button type="submit" className="primary" disabled={busy}>Сохранить</button>
-          <button type="button" onClick={onSignOut}>Выйти</button>
-        </div>
-
-        <div className="profile-sync">
-          <span>{STATUS[status]}</span>
-          <button type="button" disabled={status === 'syncing'} onClick={onSync}>Синхронизировать</button>
-        </div>
+        {dirty && (
+          <button type="submit" className="primary profile-save" disabled={busy}>Сохранить</button>
+        )}
       </form>
+
+      <section className="profile-section">
+        <ThemePicker />
+      </section>
+
+      <section className="profile-section">
+        <h3>Напоминания</h3>
+        <p className="profile-muted">Появятся в приложении для телефона.</p>
+      </section>
+
+      <section className="profile-section">
+        <h3>Данные</h3>
+        <div className="profile-row">
+          <span>{STATUS[status]}</span>
+          <button type="button" className="link-button" disabled={status === 'syncing'} onClick={onSync}>
+            Синхронизировать
+          </button>
+        </div>
+        <div className="backup-actions">
+          <button type="button" onClick={onExport}>Скачать копию</button>
+          <button type="button" onClick={() => importRef.current?.click()}>Восстановить</button>
+          <input
+            ref={importRef}
+            hidden
+            type="file"
+            accept="application/json"
+            onChange={(event) => {
+              const file = event.target.files?.[0];
+              event.target.value = '';
+              onImport(file);
+            }}
+          />
+        </div>
+      </section>
+
+      {showInstall && (
+        <section className="profile-section">
+          {installPrompt ? (
+            <button type="button" className="utility-row" onClick={onInstall}>
+              <span><strong>Установить Ritmo</strong><small>Иконка на главном экране</small></span>
+              <ChevronRight />
+            </button>
+          ) : (
+            <div className="ios-hint">
+              <strong>На экран «Домой»</strong>
+              <span>Safari → Поделиться → На экран «Домой»</span>
+            </div>
+          )}
+        </section>
+      )}
+
+      <section className="profile-section profile-account">
+        <button type="button" className="profile-signout" onClick={onSignOut}>Выйти</button>
+      </section>
     </EditorSheet>
   );
+}
+
+function isIOS() {
+  return /iphone|ipad|ipod/i.test(window.navigator.userAgent);
+}
+
+function isStandalone() {
+  return window.matchMedia('(display-mode: standalone)').matches
+    || Boolean((window.navigator as Navigator & { standalone?: boolean }).standalone);
 }

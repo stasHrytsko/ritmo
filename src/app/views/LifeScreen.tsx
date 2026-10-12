@@ -1,11 +1,10 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useState } from 'react';
 import type { LifeView } from '../../application/ritmoService';
 import type { Goal, GoalTask, Routine } from '../../domain/types';
 import { addDays, routineMinutes, toISODate } from '../../domain/time';
 import { EditorSheet } from '../components/EditorSheet';
 import { Check, ChevronRight } from '../components/icons';
 import { Empty, Segmented, type SegmentOption } from '../components/ui';
-import { THEME_PREFERENCES, useThemePreference, type ThemePreference } from '../theme';
 
 type LifeTab = 'routines' | 'goals';
 
@@ -68,8 +67,6 @@ export function LifeScreen({
   data,
   openNewRoutine = false,
   onNewRoutineOpened,
-  dataMenuOpen,
-  installPrompt,
   onSaveRoutine,
   onDeleteRoutine,
   onToggleActive,
@@ -77,17 +74,10 @@ export function LifeScreen({
   onDeleteGoal,
   onAddTask,
   onToggleTask,
-  onCloseDataMenu,
-  onExport,
-  onImport,
-  onInstall,
-  cloudSlot
 }: {
   data: LifeView;
   openNewRoutine?: boolean;
   onNewRoutineOpened?: () => void;
-  dataMenuOpen: boolean;
-  installPrompt: BeforeInstallPromptEvent | null;
   onSaveRoutine: (draft: RoutineDraft, existing?: Routine) => Promise<void>;
   onDeleteRoutine: (id: string) => Promise<void>;
   onToggleActive: (routine: Routine) => Promise<void>;
@@ -95,18 +85,12 @@ export function LifeScreen({
   onDeleteGoal: (id: string) => Promise<void>;
   onAddTask: (goalId: string, title: string) => Promise<void>;
   onToggleTask: (task: GoalTask) => Promise<void>;
-  onCloseDataMenu: () => void;
-  onExport: () => void;
-  onImport: (file?: File) => void;
-  onInstall: () => void;
-  cloudSlot?: ReactNode;
 }) {
   const [tab, setTab] = useState<LifeTab>('routines');
   const [editorOpen, setEditorOpen] = useState(false);
   const [routineDraft, setRoutineDraft] = useState<RoutineDraft>(emptyRoutineDraft);
   const [goalDraft, setGoalDraft] = useState<GoalDraft>(emptyGoalDraft);
   const [taskDraft, setTaskDraft] = useState('');
-  const importRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!openNewRoutine) return;
@@ -179,7 +163,6 @@ export function LifeScreen({
     setTaskDraft('');
   };
 
-  const showInstallSection = Boolean(installPrompt) || (isIOS() && !isStandalone());
 
   return (
     <section className="screen life-screen">
@@ -443,76 +426,10 @@ export function LifeScreen({
         </EditorSheet>
       )}
 
-      <section className="utility-section">
-        <ThemePicker />
-      </section>
-
-      {showInstallSection && (
-        <section className="utility-section">
-          {installPrompt && (
-            <button type="button" className="utility-row" onClick={onInstall}>
-              <span><strong>Установить Ritmo</strong><small>Иконка на главном экране</small></span>
-              <ChevronRight />
-            </button>
-          )}
-          {isIOS() && !isStandalone() && (
-            <div className="ios-hint">
-              <strong>На экран «Домой»</strong>
-              <span>Safari → Поделиться → На экран «Домой»</span>
-            </div>
-          )}
-        </section>
-      )}
-
-      {dataMenuOpen && (
-        <EditorSheet title="Данные" onClose={onCloseDataMenu}>
-          {cloudSlot}
-          <div className="data-sheet-copy">
-            <strong>Бэкап в файл</strong>
-            <span>Рутины, цели и вся история отметок. Локальная копия всегда остаётся на этом устройстве.</span>
-          </div>
-          <div className="backup-actions">
-            <button type="button" onClick={onExport}>Сохранить бэкап</button>
-            <button type="button" onClick={() => importRef.current?.click()}>Восстановить из бэкапа</button>
-            <input
-              ref={importRef}
-              hidden
-              type="file"
-              accept="application/json"
-              onChange={(event) => {
-                const file = event.target.files?.[0];
-                event.target.value = '';
-                onImport(file);
-              }}
-            />
-          </div>
-        </EditorSheet>
-      )}
     </section>
   );
 }
 
-const THEME_LABELS: Record<ThemePreference, string> = {
-  system: 'Как в системе',
-  light: 'Светлая',
-  dark: 'Тёмная'
-};
-
-function ThemePicker() {
-  const [preference, choose] = useThemePreference();
-
-  return (
-    <div className="field theme-field">
-      <span id="theme-label">Тема</span>
-      <Segmented
-        options={THEME_PREFERENCES.map((option) => ({ value: option, label: THEME_LABELS[option] }))}
-        value={preference}
-        labelledBy="theme-label"
-        onChange={choose}
-      />
-    </div>
-  );
-}
 
 const GROUPS = ['Утро', 'День', 'Вечер', 'В любое время'] as const;
 
@@ -556,13 +473,4 @@ function formatSchedule(days: number[]) {
     .sort((a, b) => a - b)
     .map((day) => WEEKDAYS[day - 1]?.short ?? '')
     .join(', ');
-}
-
-function isIOS() {
-  return /iphone|ipad|ipod/i.test(window.navigator.userAgent);
-}
-
-function isStandalone() {
-  return window.matchMedia('(display-mode: standalone)').matches
-    || Boolean((window.navigator as Navigator & { standalone?: boolean }).standalone);
 }

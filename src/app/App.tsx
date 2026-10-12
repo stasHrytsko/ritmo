@@ -23,7 +23,8 @@ import { TodayScreen } from './views/TodayScreen';
 import { ProgressScreen } from './views/ProgressScreen';
 import { LifeScreen, type BeforeInstallPromptEvent } from './views/LifeScreen';
 import { NotesScreen } from './views/NotesScreen';
-import { CloudPanel } from './components/CloudPanel';
+import { ConfirmHost } from './components/ConfirmHost';
+import { askConfirm } from './components/confirm';
 import { cloudConfigured } from '../infrastructure/cloud';
 import { WelcomeScreen } from './views/WelcomeScreen';
 import { Avatar } from './components/Avatar';
@@ -71,7 +72,6 @@ export function App() {
   const [screen, setScreen] = useState<Screen | null>(null);
   const [busy, setBusy] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [dataMenuOpen, setDataMenuOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   // Today can ask Life to open straight into a new routine.
   const [newRoutineIntent, setNewRoutineIntent] = useState(false);
@@ -216,7 +216,6 @@ export function App() {
       selectedDayRef.current = undefined;
     }
     setView(target);
-    setDataMenuOpen(false);
     void refresh(target);
   };
 
@@ -305,15 +304,16 @@ export function App() {
       // user is asked to give up what they already have.
       const payload = parseBackup(JSON.parse(await file.text()));
 
-      const confirmed = window.confirm(
-        `Восстановить: ${describeBackup(payload)}?\n\n`
-        + 'Всё, что сейчас хранится на этом устройстве, будет заменено.'
-      );
+      const confirmed = await askConfirm({
+        title: 'Восстановить из бэкапа?',
+        body: `В файле: ${describeBackup(payload)}. Всё, что сейчас есть в приложении, будет заменено.`,
+        confirm: 'Восстановить',
+        danger: true
+      });
       if (!confirmed) return;
 
       await service.importBackup(payload);
-      setDataMenuOpen(false);
-      await refresh('life');
+        await refresh('life');
     } catch (cause) {
       setError(describeError(cause));
     }
@@ -328,7 +328,14 @@ export function App() {
 
   if (cloudConfigured && !cloud.ready) return null;
   // No account, no app: everything in Ritmo belongs to a signed-in account.
-  if (cloudConfigured && !cloud.session) return <WelcomeScreen />;
+  if (cloudConfigured && !cloud.session) {
+    return (
+      <>
+        <WelcomeScreen />
+        <ConfirmHost />
+      </>
+    );
+  }
 
   const shown = screen && pendingDelete ? withoutIds(screen, pendingDelete.ids) : screen;
 
@@ -337,18 +344,7 @@ export function App() {
       <header className="topbar">
         <button type="button" className="brand" onClick={() => navigate('day')}>Ritmo<span>.</span></button>
         <div className="topbar-right">
-          {view === 'life' ? (
-            <button
-              type="button"
-              className="topbar-menu"
-              aria-label="Данные"
-              onClick={() => setDataMenuOpen(true)}
-            >
-              ⋯
-            </button>
-          ) : (
-            <TopbarMark view={view} screen={screen} />
-          )}
+          <TopbarMark view={view} screen={screen} />
           {cloudConfigured && (
             <button
               type="button"
@@ -368,6 +364,10 @@ export function App() {
           status={cloud.status}
           onSync={() => void cloud.sync()}
           onSignOut={() => void cloud.leave()}
+          onExport={() => void exportBackup()}
+          onImport={(file) => void importBackup(file)}
+          installPrompt={installPrompt}
+          onInstall={() => void installApp()}
           onClose={() => setProfileOpen(false)}
         />
       )}
@@ -468,9 +468,7 @@ export function App() {
             data={shown.data}
             openNewRoutine={newRoutineIntent}
             onNewRoutineOpened={() => setNewRoutineIntent(false)}
-            dataMenuOpen={dataMenuOpen}
-            installPrompt={installPrompt}
-            onSaveRoutine={async (draft, existing) => {
+                        onSaveRoutine={async (draft, existing) => {
               if (existing) {
                 await service.updateRoutine({
                   ...existing,
@@ -531,22 +529,11 @@ export function App() {
               await refresh('life');
             }}
             onToggleTask={toggleTask}
-            onCloseDataMenu={() => setDataMenuOpen(false)}
-            onExport={() => void exportBackup()}
-            onImport={(file) => void importBackup(file)}
-            onInstall={() => void installApp()}
-            cloudSlot={(
-              <CloudPanel
-                session={cloud.session}
-                status={cloud.status}
-                message={cloud.message}
-                onSync={() => void cloud.sync()}
-                onSignOut={() => void cloud.leave()}
-              />
-            )}
           />
         )}
       </main>
+
+      <ConfirmHost />
 
       {pendingDelete && (
         <UndoToast

@@ -3713,3 +3713,103 @@ input {
 .first-run .primary {
   margin-top: 6px;
 }
+
+/* In-app confirmation sheet. */
+.confirm-body {
+  margin: 0 0 16px;
+  color: var(--muted);
+  font-size: 15px;
+  line-height: 1.45;
+  white-space: pre-line;
+}
+
+.confirm-actions {
+  display: grid;
+  gap: 8px;
+}
+
+.confirm-actions .primary {
+  margin-top: 0;
+}
+
+.confirm-actions .primary.is-danger {
+  background: var(--danger);
+  color: #fff;
+}
+
+.confirm-cancel {
+  min-height: 48px;
+  border: 0;
+  border-radius: 16px;
+  background: var(--row);
+  color: inherit;
+  font: inherit;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+/* Profile sheet sections. */
+.profile-save {
+  margin-top: 0;
+}
+
+.profile-section {
+  margin-top: 18px;
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+  display: grid;
+  gap: 10px;
+}
+
+.profile-section h3 {
+  margin: 0;
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.profile-muted {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.profile-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.link-button {
+  border: 0;
+  background: none;
+  padding: 8px 0;
+  color: var(--ink);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.link-button:disabled {
+  opacity: .5;
+}
+
+.profile-section .backup-actions {
+  margin-top: 0;
+}
+
+.profile-signout {
+  min-height: 48px;
+  border: 0;
+  border-radius: 16px;
+  background: var(--row);
+  color: inherit;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}

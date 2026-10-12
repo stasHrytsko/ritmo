@@ -1,15 +1,6 @@
-import { useState } from 'react';
-import type { Session } from '@supabase/supabase-js';
-import { cloudConfigured, describeAuthError, requestCode, verifyCode } from '../../infrastructure/cloud';
-import type { SyncStatus } from '../cloudSync';
+import { useEffect, useState } from 'react';
+import { describeAuthError, requestCode, verifyCode } from '../../infrastructure/cloud';
 
-const STATUS_LABELS: Record<SyncStatus, string> = {
-  off: '',
-  idle: 'Готово к синхронизации',
-  syncing: 'Синхронизация…',
-  synced: 'Всё сохранено в облаке',
-  error: 'Не удалось синхронизировать'
-};
 
 /** Email + one-time code. The same flow signs in and registers. */
 export function AuthForm({
@@ -27,6 +18,14 @@ export function AuthForm({
   const [sent, setSent] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Seconds until another code may be requested; email providers throttle.
+  const [cooldown, setCooldown] = useState(0);
+
+  useEffect(() => {
+    if (cooldown <= 0) return;
+    const timer = window.setTimeout(() => setCooldown((value) => value - 1), 1000);
+    return () => window.clearTimeout(timer);
+  }, [cooldown]);
 
   const run = async (action: () => Promise<void>) => {
     setBusy(true);
@@ -49,6 +48,7 @@ export function AuthForm({
           if (!sent) {
             await requestCode(email.trim(), name.trim() || undefined);
             setSent(true);
+            setCooldown(60);
           } else {
             await verifyCode(email.trim(), code.trim());
             setCode('');
@@ -65,13 +65,13 @@ export function AuthForm({
             : intro ?? 'Введите почту, мы пришлём код. Пароль не нужен.'}
         </span>
       </div>
-      <input
+      {!sent && <input
         autoComplete="name"
         placeholder="Как вас зовут (необязательно)"
         value={name}
         disabled={sent || busy}
         onChange={(event) => setName(event.target.value)}
-      />
+      />}
       <input
         type="email"
         inputMode="email"
@@ -95,40 +95,20 @@ export function AuthForm({
       {error && <span role="alert" className="cloud-error">{error}</span>}
       <div className="backup-actions">
         <button type="submit" className="primary" disabled={busy}>{sent ? 'Войти' : 'Получить код'}</button>
-        {sent && <button type="button" onClick={() => { setSent(false); setCode(''); }}>Другая почта</button>}
+        {sent && (
+          <button
+            type="button"
+            disabled={busy || cooldown > 0}
+            onClick={() => void run(async () => {
+              await requestCode(email.trim(), name.trim() || undefined);
+              setCooldown(60);
+            })}
+          >
+            {cooldown > 0 ? `Новый код через ${cooldown} с` : 'Отправить код ещё раз'}
+          </button>
+        )}
+        {sent && <button type="button" onClick={() => { setSent(false); setCode(''); setError(null); }}>Другая почта</button>}
       </div>
     </form>
-  );
-}
-
-export function CloudPanel({
-  session,
-  status,
-  message,
-  onSync,
-  onSignOut
-}: {
-  session: Session | null;
-  status: SyncStatus;
-  message: string | null;
-  onSync: () => void;
-  onSignOut: () => void;
-}) {
-  if (!cloudConfigured) return null;
-  if (!session) return <AuthForm />;
-
-  return (
-    <div className="cloud-panel">
-      <div className="data-sheet-copy">
-        <strong>Облако</strong>
-        <span>{(session.user.user_metadata?.name as string | undefined) ?? session.user.email}</span>
-      {session.user.user_metadata?.name ? <span>{session.user.email}</span> : null}
-        <span>{STATUS_LABELS[status]}{message ? `: ${message}` : ''}</span>
-      </div>
-      <div className="backup-actions">
-        <button type="button" disabled={status === 'syncing'} onClick={onSync}>Синхронизировать</button>
-        <button type="button" onClick={onSignOut}>Выйти</button>
-      </div>
-    </div>
   );
 }

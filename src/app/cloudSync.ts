@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { describeBackup } from '../domain/backup';
+import { askConfirm } from './components/confirm';
 import {
   cloudConfigured,
   describeAuthError,
@@ -87,11 +88,16 @@ export function useCloudSync({ exportBackup, importBackup, resetLocal, onPulled 
 
       if (!cloud) {
         if (anonymous && interactive) {
-          const keep = window.confirm(
-            `На этом устройстве уже есть данные (${describeBackup(local)}).\n\n`
-            + 'ОК — перенести их в этот аккаунт.\n'
-            + 'Отмена — начать с чистого листа (данные на устройстве будут удалены).'
-          );
+          const keep = await askConfirm({
+            title: 'На этом устройстве уже есть данные',
+            body: `${describeBackup(local)}. Перенести их в этот аккаунт или начать с чистого листа? При чистом листе данные с устройства будут удалены.`,
+            confirm: 'Перенести в аккаунт',
+            cancel: 'Начать с чистого листа'
+          });
+          if (keep === null) {
+            setStatus('idle');
+            return false;
+          }
           if (!keep) {
             await resetLocal();
             onPulled();
@@ -110,10 +116,18 @@ export function useCloudSync({ exportBackup, importBackup, resetLocal, onPulled 
         const cloudHash = fingerprint(cloud.payload);
         let pull = !dirty || !hasData(local) || cloudHash === hash;
         if (!pull && interactive) {
-          pull = window.confirm(
-            'В облаке есть другая версия данных.\n\nОК — взять облачную (данные на этом устройстве будут заменены).\n'
-            + 'Отмена — оставить данные этого устройства и перезаписать облако.'
-          );
+          const choice = await askConfirm({
+            title: 'Данные отличаются',
+            body: 'В облаке и на этом устройстве разные версии. Какую оставить? Другая будет заменена.',
+            confirm: 'Взять из облака',
+            cancel: 'Оставить с устройства'
+          });
+          if (choice === null) {
+            setStatus('idle');
+            setMessage('Нужно выбрать версию — нажмите «Синхронизировать».');
+            return false;
+          }
+          pull = choice;
         } else if (!pull) {
           setStatus('idle');
           setMessage('Нужно выбрать версию — нажмите «Синхронизировать».');
@@ -158,15 +172,23 @@ export function useCloudSync({ exportBackup, importBackup, resetLocal, onPulled 
    * sign in starts clean. Everything is saved to the cloud first.
    */
   const leave = useCallback(async () => {
-    if (!window.confirm(
-      'Выйти из аккаунта?\n\nДанные сохранены в облаке — при следующем входе они вернутся. '
-      + 'С этого устройства они будут удалены.'
-    )) return;
+    const sure = await askConfirm({
+      title: 'Выйти из аккаунта?',
+      body: 'Данные сохранены в облаке и вернутся при следующем входе. С этого устройства они будут удалены.',
+      confirm: 'Выйти'
+    });
+    if (!sure) return;
 
     const saved = await sync();
-    if (!saved && !window.confirm(
-      'Не удалось сохранить данные в облако.\n\nЕсли выйти сейчас, несохранённые изменения на этом устройстве пропадут. Выйти всё равно?'
-    )) return;
+    if (!saved) {
+      const anyway = await askConfirm({
+        title: 'Не удалось сохранить в облако',
+        body: 'Если выйти сейчас, изменения, сделанные на этом устройстве после последней синхронизации, пропадут.',
+        confirm: 'Всё равно выйти',
+        danger: true
+      });
+      if (!anyway) return;
+    }
 
     try {
       await signOut();
