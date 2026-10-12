@@ -3,6 +3,7 @@ import type { Session } from '@supabase/supabase-js';
 import { describeBackup } from '../domain/backup';
 import {
   cloudConfigured,
+  describeAuthError,
   fetchBackup,
   fingerprint,
   getSession,
@@ -134,7 +135,7 @@ export function useCloudSync({ exportBackup, importBackup, resetLocal, onPulled 
       return true;
     } catch (cause) {
       setStatus('error');
-      setMessage(cause instanceof Error ? cause.message : String(cause));
+      setMessage(describeAuthError(cause));
       return false;
     } finally {
       running.current = false;

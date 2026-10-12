@@ -1188,8 +1188,30 @@ input {
 
 .date-fields {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 8px;
+}
+
+/* Native date and time inputs have a wide intrinsic size; without this they
+   push the sheet past the screen edge on a phone. */
+.date-fields input,
+.field input[type="date"],
+.field input[type="time"] {
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.form-hint {
+  margin: 10px 0 0;
+  font-size: 13px;
+  color: var(--muted);
+  text-align: center;
+}
+
+.primary:disabled {
+  opacity: .45;
+  cursor: default;
 }
 
 .weekday-picker {

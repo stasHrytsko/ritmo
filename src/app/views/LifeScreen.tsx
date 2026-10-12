@@ -124,9 +124,23 @@ export function LifeScreen({
     setEditorOpen(true);
   };
 
+  // What still stops a draft from being saved, said in words rather than a
+  // button that silently does nothing.
+  const routineProblem = !routineDraft.name.trim()
+    ? 'Добавьте название'
+    : routineDraft.weekdays.length === 0
+      ? 'Выберите хотя бы один день'
+      : routineDraft.timing === 'exact' && !routineDraft.time
+        ? 'Укажите время'
+        : null;
+  const goalProblem = !goalDraft.name.trim()
+    ? 'Добавьте название'
+    : goalDraft.endDate < goalDraft.startDate
+      ? 'Конец не может быть раньше начала'
+      : null;
+
   const saveRoutine = async () => {
-    if (!routineDraft.name.trim() || routineDraft.weekdays.length === 0) return;
-    if (routineDraft.timing === 'exact' && !routineDraft.time) return;
+    if (routineProblem) return;
 
     const existing = routineDraft.id
       ? data.routines.find((item) => item.id === routineDraft.id)
@@ -138,7 +152,7 @@ export function LifeScreen({
   };
 
   const saveGoal = async () => {
-    if (!goalDraft.name.trim()) return;
+    if (goalProblem) return;
 
     const existing = goalDraft.id ? data.goals.find((item) => item.id === goalDraft.id) : undefined;
     if (goalDraft.id && !existing) return;
@@ -263,7 +277,7 @@ export function LifeScreen({
             <input
               value={routineDraft.name}
               onChange={(event) => setRoutineDraft({ ...routineDraft, name: event.target.value })}
-              placeholder="Зал, вода, выгулять Локи…"
+              placeholder="Зарядка, вода, прогулка…"
             />
           </label>
 
@@ -316,9 +330,10 @@ export function LifeScreen({
             </label>
           )}
 
-          <button type="button" className="primary" onClick={() => void saveRoutine()}>
+          <button type="button" className="primary" disabled={Boolean(routineProblem)} onClick={() => void saveRoutine()}>
             {routineDraft.id ? 'Сохранить' : 'Добавить рутину'}
           </button>
+          {routineProblem && <p className="form-hint">{routineProblem}</p>}
 
           {routineDraft.id && (
             <button
@@ -362,9 +377,10 @@ export function LifeScreen({
             </label>
           </div>
 
-          <button type="button" className="primary" onClick={() => void saveGoal()}>
+          <button type="button" className="primary" disabled={Boolean(goalProblem)} onClick={() => void saveGoal()}>
             {goalDraft.id ? 'Сохранить' : 'Добавить цель'}
           </button>
+          {goalProblem && <p className="form-hint">{goalProblem}</p>}
 
           {goalDraft.id && (
             <>

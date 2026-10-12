@@ -158,3 +158,27 @@ export const writeOwner = (userId: string) => {
 export const clearOwner = () => {
   try { localStorage.removeItem(OWNER_KEY); } catch { /* storage unavailable */ }
 };
+
+/**
+ * Supabase speaks English; people here read Russian. Known cases get a plain
+ * sentence, anything else a calm fallback rather than a raw server string.
+ */
+export const describeAuthError = (cause: unknown): string => {
+  const error = cause as { code?: string; status?: number; message?: string } | null;
+  const code = error?.code ?? '';
+  const message = (error?.message ?? String(cause)).toLowerCase();
+
+  if (code === 'otp_expired' || message.includes('expired') || (message.includes('invalid') && message.includes('token'))) {
+    return 'Код неверный или устарел. Проверьте письмо или запросите новый код.';
+  }
+  if (code.includes('rate_limit') || error?.status === 429 || message.includes('rate limit')) {
+    return 'Слишком много попыток подряд. Подождите минуту и попробуйте снова.';
+  }
+  if (code === 'email_address_invalid' || (message.includes('email') && message.includes('invalid'))) {
+    return 'Проверьте адрес почты — кажется, в нём опечатка.';
+  }
+  if (message.includes('failed to fetch') || message.includes('network') || message.includes('load failed')) {
+    return 'Нет соединения с интернетом. Проверьте сеть и попробуйте ещё раз.';
+  }
+  return 'Не получилось. Попробуйте ещё раз чуть позже.';
+};

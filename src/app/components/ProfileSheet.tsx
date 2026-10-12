@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import {
   changeEmail,
+  describeAuthError,
   profileOf,
   saveProfile,
   AVATARS,
@@ -91,7 +92,7 @@ function SignedIn({
         onClose();
       }
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : String(cause));
+      setError(describeAuthError(cause));
     } finally {
       setBusy(false);
     }

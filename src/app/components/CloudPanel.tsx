@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { Session } from '@supabase/supabase-js';
-import { cloudConfigured, requestCode, verifyCode } from '../../infrastructure/cloud';
+import { cloudConfigured, describeAuthError, requestCode, verifyCode } from '../../infrastructure/cloud';
 import type { SyncStatus } from '../cloudSync';
 
 const STATUS_LABELS: Record<SyncStatus, string> = {
@@ -34,7 +34,7 @@ export function AuthForm({
     try {
       await action();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : String(cause));
+      setError(describeAuthError(cause));
     } finally {
       setBusy(false);
     }
