@@ -4099,3 +4099,130 @@ input {
   stroke-dashoffset: 0;
   transition: stroke-dashoffset .2s ease-out;
 }
+
+/* One card, face down until tapped. */
+.card-back-single {
+  width: 100%;
+  min-height: 120px;
+  margin-top: 4px;
+  display: grid;
+  place-items: center;
+  font-size: 15px;
+  background:
+    repeating-linear-gradient(45deg, var(--accent-soft) 0 8px, transparent 8px 16px),
+    var(--row);
+}
+
+.card-back-single span {
+  color: var(--ink);
+}
+
+.onboarding-art.cards .card-back-single {
+  width: 110px;
+  min-height: 140px;
+}
+
+.card-banner-body > p {
+  margin: 10px 0 0;
+}
+
+.card-banner-head .card-banner-title {
+  margin-top: 0;
+}
+
+.card-banner.is-complete .card-banner-toggle {
+  gap: 12px;
+}
+
+.card-note {
+  margin-top: 14px;
+  display: grid;
+  gap: 8px;
+}
+
+.card-note label {
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.card-note textarea {
+  width: 100%;
+  box-sizing: border-box;
+  resize: vertical;
+  min-height: 84px;
+  padding: 12px 14px;
+  border: 1px solid var(--line-strong);
+  border-radius: 14px;
+  background: var(--surface);
+  color: inherit;
+  font: inherit;
+  font-size: 16px;
+  line-height: 1.45;
+}
+
+.card-note textarea:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.card-note-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.card-note-save {
+  min-height: 40px;
+  padding: 0 18px;
+  border: 0;
+  border-radius: 12px;
+  background: var(--ink);
+  color: var(--on-ink);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.card-cadence {
+  margin-top: 14px;
+}
+
+.year-card-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+}
+
+.year-card-list li {
+  display: flex;
+  gap: 14px;
+  padding: 12px 0;
+  border-top: 1px solid var(--line);
+}
+
+.year-card-list li:first-child {
+  border-top: 0;
+}
+
+.year-card-date {
+  flex: 0 0 52px;
+  font-size: 13px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.year-card-copy {
+  display: grid;
+  gap: 4px;
+}
+
+.year-card-copy small {
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.4;
+  white-space: pre-line;
+}

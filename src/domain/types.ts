@@ -102,17 +102,24 @@ export interface WeekRecord {
 
 export type CardTier = 'easy' | 'medium' | 'hard';
 
+/** How often a new card comes: once a week or every day. */
+export type CardCadence = 'week' | 'day';
+
 /**
- * The week's set of three cards, drawn once and kept, so every device and every
- * reopening shows the same three. Id is the week's start date.
+ * A period's card, drawn once and kept, so every device and every reopening
+ * shows the same one. Id is the week's start date for weekly cards and
+ * `d:` + the date for daily ones. Older records drew three cards (one per
+ * tier); the first is the one that counts now.
  */
 export interface WeeklyCardPick {
-  id: ISODate;
-  /** One card per tier, in easy / medium / hard order. */
+  id: string;
   cardIds: string[];
+  /** Set once the card has been turned over. */
   pickedId?: string;
   pickedAt?: string;
   doneAt?: string;
+  /** The person's own words about how it went, for remembering. */
+  note?: string;
   createdAt: string;
 }
 
@@ -122,6 +129,7 @@ export interface AppSettings {
   installedAt: string;
   dayBoundaryHour: number;
   defaultsSeedVersion?: number;
+  cardCadence?: CardCadence;
 }
 
 export interface BackupPayload {

@@ -1,31 +1,48 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { WeeklyCardView } from '../../application/ritmoService';
-import { CARD_TIER_LABELS } from '../../domain/weeklyCards';
-import { Check, Chevron, StarRow } from './icons';
+import type { CardCadence } from '../../domain/types';
 import { Collapse } from './Collapse';
+import { Check, Chevron } from './icons';
+import { Segmented } from './ui';
 
-const until = (deadline: Date) =>
-  `до ${deadline.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' })}`;
+const CADENCES = [
+  { value: 'week', label: 'Раз в неделю' },
+  { value: 'day', label: 'Каждый день' }
+] as const;
+
+const until = (card: WeeklyCardView) =>
+  card.cadence === 'day'
+    ? 'до конца дня'
+    : `до ${card.deadline.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' })}`;
+
+const titleOf = (card: WeeklyCardView) => (card.cadence === 'day' ? 'Карта дня' : 'Карта недели');
 
 /**
- * The week's card, above the routine. Three face-down cards to choose from;
- * the content is only shown once one is picked. Quiet by design: nothing here
- * is owed, and an unopened set simply expires on Sunday.
+ * The period's one card, above the routine. Face down until tapped — it may be
+ * easy or very hard, that is the chance. Once done, a few words can be kept
+ * with it, to remember what it was like.
  */
 export function WeeklyCardBanner({
   card,
-  onPick,
+  onReveal,
   onComplete,
-  onReopen
+  onReopen,
+  onNote,
+  onCadence
 }: {
   card: WeeklyCardView;
-  onPick: (cardId: string) => Promise<void>;
+  onReveal: () => Promise<void>;
   onComplete: () => Promise<void>;
   onReopen: () => Promise<void>;
+  onNote: (note: string) => Promise<void>;
+  onCadence: (cadence: CardCadence) => Promise<void>;
 }) {
   const [busy, setBusy] = useState(false);
   // Folded by default: the card is an invitation, not a block of the day.
   const [open, setOpen] = useState(false);
+  const [note, setNote] = useState(card.note ?? '');
+  useEffect(() => setNote(card.note ?? ''), [card.note, card.periodId]);
+
   const run = async (action: () => Promise<void>) => {
     if (busy) return;
     setBusy(true);
@@ -36,27 +53,17 @@ export function WeeklyCardBanner({
     }
   };
 
-  if (card.state === 'done' && card.picked) {
-    return (
-      <div className="card-banner is-done">
-        <span className="card-banner-check"><Check /></span>
-        <span>
-          <strong>Карта недели выполнена</strong>
-          <small>{card.picked.card.title}</small>
-        </span>
-        <button type="button" className="card-banner-undo" disabled={busy} onClick={() => void run(onReopen)}>
-          Отменить
-        </button>
-      </div>
-    );
-  }
-
-  const active = card.state === 'active' ? card.picked?.card : undefined;
+  const face = card.card;
+  const summary = card.state === 'closed'
+    ? `Закрыта · ${until(card)}`
+    : card.state === 'done'
+      ? `Выполнена · ${face?.title}`
+      : open ? until(card) : face?.title;
 
   return (
     <section
-      className={`card-banner is-fold${open ? ' is-expanded' : ''}${active ? ` tier-${active.tier}` : ''}`}
-      aria-label="Карта недели"
+      className={`card-banner is-fold${open ? ' is-expanded' : ''}${card.state === 'done' ? ' is-complete' : ''}`}
+      aria-label={titleOf(card)}
     >
       <button
         type="button"
@@ -64,49 +71,76 @@ export function WeeklyCardBanner({
         aria-expanded={open}
         onClick={() => setOpen((current) => !current)}
       >
+        {card.state === 'done' && <span className="card-banner-check"><Check /></span>}
         <span className="card-banner-summary">
-          <strong>Карта недели</strong>
-          <small>{active ? active.title : `Три карты · ${until(card.deadline)}`}</small>
+          <strong>{titleOf(card)}</strong>
+          <small>{summary}</small>
         </span>
-        {active && <StarRow tier={active.tier} />}
         <Chevron />
       </button>
 
       <Collapse open={open}>
-        {active ? (
-          <div className="card-banner-body">
-            <div className="card-banner-head">
-              <span className="card-banner-tier">{CARD_TIER_LABELS[active.tier]}</span>
-              <span className="card-banner-deadline">{until(card.deadline)}</span>
-            </div>
-            <p>{active.text}</p>
+        <div className="card-banner-body">
+          {card.state === 'closed' && (
+            <>
+              <button
+                type="button"
+                className="card-back card-back-single"
+                disabled={busy}
+                onClick={() => void run(onReveal)}
+              >
+                <span>Открыть карту</span>
+              </button>
+              <p>Лёгкая или очень сложная — решает случай. Выполнять необязательно.</p>
+            </>
+          )}
+
+          {card.state !== 'closed' && face && (
+            <>
+              <div className="card-banner-head">
+                <strong className="card-banner-title">{face.title}</strong>
+              </div>
+              <p>{face.text}</p>
+            </>
+          )}
+
+          {card.state === 'active' && (
             <button type="button" className="card-banner-done" disabled={busy} onClick={() => void run(onComplete)}>
               Сделано
             </button>
-          </div>
-        ) : (
-          <div className="card-banner-body">
-            <p>Выбери одну, не заглядывая. Необязательно.</p>
-            <div className="card-backs">
-              {card.options.map((option) => (
-                <button
-                  key={option.id}
-                  type="button"
-                  className={`card-back tier-${option.tier}`}
-                  disabled={busy}
-                  aria-label={`${CARD_TIER_LABELS[option.tier]} карта`}
-                  onClick={() => void run(async () => {
-                    await onPick(option.id);
-                    setOpen(true);
-                  })}
-                >
-                  <StarRow tier={option.tier} />
-                  <span>{CARD_TIER_LABELS[option.tier]}</span>
+          )}
+
+          {card.state === 'done' && (
+            <div className="card-note">
+              <label htmlFor={`card-note-${card.periodId}`}>Как это было</label>
+              <textarea
+                id={`card-note-${card.periodId}`}
+                rows={3}
+                value={note}
+                placeholder="Пара слов на память: где, с кем, что почувствовали…"
+                onChange={(event) => setNote(event.target.value)}
+              />
+              <div className="card-note-actions">
+                <button type="button" className="card-banner-undo" disabled={busy} onClick={() => void run(onReopen)}>
+                  Отменить «Сделано»
                 </button>
-              ))}
+                {note.trim() !== (card.note ?? '') && (
+                  <button type="button" className="card-note-save" disabled={busy} onClick={() => void run(() => onNote(note))}>
+                    Сохранить
+                  </button>
+                )}
+              </div>
             </div>
+          )}
+
+          <div className="card-cadence">
+            <Segmented
+              options={CADENCES.map((option) => ({ ...option }))}
+              value={card.cadence}
+              onChange={(cadence) => void run(() => onCadence(cadence))}
+            />
           </div>
-        )}
+        </div>
       </Collapse>
     </section>
   );

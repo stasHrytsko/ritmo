@@ -19,7 +19,7 @@ import { NavButton } from './components/BottomNav';
 import { StreakMark } from './components/icons';
 import { UndoToast } from './components/UndoToast';
 import type { PeriodView } from './components/ui';
-import { TodayScreen } from './views/TodayScreen';
+import { TodayScreen, type CardActions } from './views/TodayScreen';
 import { ProgressScreen } from './views/ProgressScreen';
 import { LifeScreen, type BeforeInstallPromptEvent } from './views/LifeScreen';
 import { NotesScreen } from './views/NotesScreen';
@@ -265,31 +265,22 @@ export function App() {
   const onboardingKey = `ritmo.onboarded:${cloud.session?.user.id ?? 'local'}`;
   const hasOnboarded = onboarded[onboardingKey] ?? readFlag(onboardingKey);
 
-  const pickCard = async (weekId: ISODate, cardId: string) => {
+  /** Card writes all end the same way: report a failure, then reload Today. */
+  const cardWrite = (write: () => Promise<void>) => async () => {
     try {
-      await service.pickWeeklyCard(weekId, cardId);
+      await write();
     } catch (cause) {
       setError(describeError(cause));
     }
     await refresh('day');
   };
 
-  const completeCard = async (weekId: ISODate) => {
-    try {
-      await service.completeWeeklyCard(weekId);
-    } catch (cause) {
-      setError(describeError(cause));
-    }
-    await refresh('day');
-  };
-
-  const reopenCard = async (weekId: ISODate) => {
-    try {
-      await service.reopenWeeklyCard(weekId);
-    } catch (cause) {
-      setError(describeError(cause));
-    }
-    await refresh('day');
+  const cardActions: CardActions = {
+    reveal: (periodId) => cardWrite(() => service.revealCard(periodId))(),
+    complete: (periodId) => cardWrite(() => service.completeWeeklyCard(periodId))(),
+    reopen: (periodId) => cardWrite(() => service.reopenWeeklyCard(periodId))(),
+    note: (periodId, note) => cardWrite(() => service.setCardNote(periodId, note))(),
+    cadence: (cadence) => cardWrite(() => service.setCardCadence(cadence))()
   };
 
   const exportBackup = async () => {
@@ -433,9 +424,7 @@ export function App() {
             onToggleRoutine={toggleRoutine}
             onToggleTask={toggleTask}
             onSelectDay={selectDay}
-            onPickCard={pickCard}
-            onCompleteCard={completeCard}
-            onReopenCard={reopenCard}
+            cardActions={cardActions}
             onAddRoutine={() => {
               setNewRoutineIntent(true);
               navigate('life');

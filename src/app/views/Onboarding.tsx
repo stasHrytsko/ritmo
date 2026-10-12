@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { ROUTINE_TEMPLATES, type RoutineTemplate } from '../../application/routineTemplates';
-import { Check, MedalMark, StarRow } from '../components/icons';
+import { Check, MedalMark } from '../components/icons';
 
 const SLIDES = [
   {
@@ -15,7 +15,7 @@ const SLIDES = [
   },
   {
     title: 'Карта недели',
-    text: 'Раз в неделю — три закрытые карты. Выберите одну наугад: небольшое задание не про продуктивность, а про жизнь. По желанию.',
+    text: 'Раз в неделю или каждый день — одна закрытая карта с заданием не про продуктивность, а про жизнь. Лёгкое или очень смелое — решает случай. После можно записать, как это было.',
     art: 'card'
   }
 ] as const;
@@ -137,9 +137,7 @@ function OnboardingArt({ kind }: { kind: (typeof SLIDES)[number]['art'] }) {
   if (kind === 'card') {
     return (
       <div className="onboarding-art cards" aria-hidden="true">
-        <span className="card-back"><StarRow tier="easy" /></span>
-        <span className="card-back"><StarRow tier="medium" /></span>
-        <span className="card-back"><StarRow tier="hard" /></span>
+        <span className="card-back card-back-single" />
       </div>
     );
   }

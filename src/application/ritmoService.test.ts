@@ -698,39 +698,54 @@ describe('goals stay in sight', () => {
   });
 });
 
-describe('weekly card', () => {
-  it('draws the week\'s set once and keeps it', async () => {
+describe('card', () => {
+  it('draws one face-down card per week and keeps it', async () => {
     const first = (await service.getDay()).card;
-    expect(first.state).toBe('choose');
-    expect(first.options).toHaveLength(3);
-    expect(first.options.map((option) => option.tier)).toEqual(['easy', 'medium', 'hard']);
-    expect(first.picked).toBeUndefined();
+    expect(first.state).toBe('closed');
+    expect(first.card).toBeUndefined();
+    expect(first.periodId).toBe(THIS_WEEK);
+    expect(first.cadence).toBe('week');
 
-    const second = (await service.getDay()).card;
-    expect(second.options.map((option) => option.id)).toEqual(first.options.map((option) => option.id));
+    await service.getDay();
     expect(store.weeklyCards).toHaveLength(1);
-    expect(second.weekId).toBe(THIS_WEEK);
+    expect(store.weeklyCards[0].cardIds).toHaveLength(1);
   });
 
-  it('allows one pick per week, then completion', async () => {
-    const { options, weekId } = (await service.getDay()).card;
-    await service.pickWeeklyCard(weekId, options[2].id);
-    await service.pickWeeklyCard(weekId, options[0].id); // too late, ignored
-
+  it('reveals, completes, keeps a note and counts the card in the year', async () => {
+    const { periodId } = (await service.getDay()).card;
+    await service.revealCard(periodId);
     let card = (await service.getDay()).card;
     expect(card.state).toBe('active');
-    expect(card.picked?.card.id).toBe(options[2].id);
+    expect(card.card?.id).toBe(store.weeklyCards[0].cardIds[0]);
 
-    await service.completeWeeklyCard(weekId);
+    await service.completeWeeklyCard(periodId);
+    await service.setCardNote(periodId, '  Было страшно, но здорово  ');
     card = (await service.getDay()).card;
     expect(card.state).toBe('done');
-    expect((await service.getYear()).cards).toEqual({ easy: 0, medium: 0, hard: 1 });
+    expect(card.note).toBe('Было страшно, но здорово');
+
+    const year = await service.getYear();
+    expect(year.cards).toHaveLength(1);
+    expect(year.cards[0].note).toBe('Было страшно, но здорово');
+
+    await service.setCardNote(periodId, '   ');
+    expect((await service.getDay()).card.note).toBeUndefined();
   });
 
-  it('ignores a card that is not in the week\'s set', async () => {
-    const { weekId } = (await service.getDay()).card;
-    await service.pickWeeklyCard(weekId, 'easy:Нет такой карты');
-    expect((await service.getDay()).card.state).toBe('choose');
+  it('switches to a card a day', async () => {
+    await service.setCardCadence('day');
+    const card = (await service.getDay()).card;
+    expect(card.cadence).toBe('day');
+    expect(card.periodId).toBe(`d:${toISODate(service.today())}`);
+    expect(store.weeklyCards.map((pick) => pick.id)).toEqual([card.periodId]);
+  });
+
+  it('does not reveal a card twice', async () => {
+    const { periodId } = (await service.getDay()).card;
+    await service.revealCard(periodId);
+    const pickedAt = store.weeklyCards[0].pickedAt;
+    await service.revealCard(periodId);
+    expect(store.weeklyCards[0].pickedAt).toBe(pickedAt);
   });
 });
 
@@ -753,12 +768,12 @@ describe('medal tiers', () => {
 });
 
 describe('polish', () => {
-  it('reopens a weekly card marked done by mistake', async () => {
-    const { options, weekId } = (await service.getDay()).card;
-    await service.pickWeeklyCard(weekId, options[0].id);
-    await service.completeWeeklyCard(weekId);
+  it('reopens a card marked done by mistake', async () => {
+    const { periodId } = (await service.getDay()).card;
+    await service.revealCard(periodId);
+    await service.completeWeeklyCard(periodId);
     expect((await service.getDay()).card.state).toBe('done');
-    await service.reopenWeeklyCard(weekId);
+    await service.reopenWeeklyCard(periodId);
     expect((await service.getDay()).card.state).toBe('active');
   });
 

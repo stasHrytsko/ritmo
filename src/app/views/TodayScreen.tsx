@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import type { TodayView } from '../../application/ritmoService';
-import type { GoalTask, ISODate } from '../../domain/types';
+import type { CardCadence, GoalTask, ISODate } from '../../domain/types';
 import { monthGenitive, plural, routineMinutes, toISODate, weekdayName } from '../../domain/time';
 import { AccordionHeader, Empty } from '../components/ui';
 import { Celebration } from '../components/Celebration';
@@ -12,6 +12,14 @@ import { WeeklyCardBanner } from '../components/WeeklyCardBanner';
 import { useTick } from '../components/useTick';
 import { WeekStrip } from '../components/WeekStrip';
 
+export interface CardActions {
+  reveal: (periodId: string) => Promise<void>;
+  complete: (periodId: string) => Promise<void>;
+  reopen: (periodId: string) => Promise<void>;
+  note: (periodId: string, note: string) => Promise<void>;
+  cadence: (cadence: CardCadence) => Promise<void>;
+}
+
 /** How far a horizontal drag has to travel before it changes the day. */
 const SWIPE_PX = 56;
 
@@ -20,18 +28,14 @@ export function TodayScreen({
   onToggleRoutine,
   onToggleTask,
   onSelectDay,
-  onPickCard,
-  onCompleteCard,
-  onReopenCard,
+  cardActions,
   onAddRoutine
 }: {
   data: TodayView;
   onToggleRoutine: (routineId: string) => Promise<void>;
   onToggleTask: (task: GoalTask) => Promise<void>;
   onSelectDay: (day: ISODate | undefined) => void;
-  onPickCard: (weekId: ISODate, cardId: string) => Promise<void>;
-  onCompleteCard: (weekId: ISODate) => Promise<void>;
-  onReopenCard: (weekId: ISODate) => Promise<void>;
+  cardActions: CardActions;
   /** Opens the routine editor; offered when there is nothing to track yet. */
   onAddRoutine: () => void;
 }) {
@@ -222,9 +226,11 @@ export function TodayScreen({
         {data.isToday && (
           <WeeklyCardBanner
             card={data.card}
-            onPick={(cardId) => onPickCard(data.card.weekId, cardId)}
-            onComplete={() => onCompleteCard(data.card.weekId)}
-            onReopen={() => onReopenCard(data.card.weekId)}
+            onReveal={() => cardActions.reveal(data.card.periodId)}
+            onComplete={() => cardActions.complete(data.card.periodId)}
+            onReopen={() => cardActions.reopen(data.card.periodId)}
+            onNote={(note) => cardActions.note(data.card.periodId, note)}
+            onCadence={cardActions.cadence}
           />
         )}
 

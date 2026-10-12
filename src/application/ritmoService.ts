@@ -1,6 +1,6 @@
 import {
   SCHEMA_VERSION,
-  type CardTier,
+  type CardCadence,
   type ISODate,
   type Goal,
   type GoalTask,
@@ -16,10 +16,11 @@ import { tierOf, type Tier } from '../domain/award';
 import { getRoutineDayStates, hasDayMedal, type RoutineDayState } from '../domain/medal';
 import {
   cardById,
-  countDoneCards,
-  drawWeeklySet,
+  cardPeriodId,
+  doneCardsInYear,
+  drawCard,
   seenCardIds,
-  type CardCounts,
+  type DoneCard,
   type WeeklyCard
 } from '../domain/weeklyCards';
 import { planForDate, routinesInWeek, withPlanRevision } from '../domain/plan';
@@ -67,16 +68,17 @@ export interface DayStrip {
 }
 
 /**
- * The week's card as the Today banner needs it. While a card is unchosen only
- * its tier is exposed: the point is to pick blind.
+ * The current card as the Today banner needs it. Until it is turned over only
+ * its existence is known: what it says, and how hard it is, stays a surprise.
  */
 export interface WeeklyCardView {
-  weekId: ISODate;
-  /** Last day to finish it: the end of the calendar week. */
+  periodId: string;
+  cadence: CardCadence;
+  /** Last day to do it: the end of the week, or today for daily cards. */
   deadline: Date;
-  state: 'choose' | 'active' | 'done';
-  options: Array<{ id: string; tier: CardTier }>;
-  picked?: { card: WeeklyCard };
+  state: 'closed' | 'active' | 'done';
+  card?: WeeklyCard;
+  note?: string;
 }
 
 export interface TodayView {
@@ -179,8 +181,8 @@ export interface YearView {
   /** Mean share done over finished tracked days of the year; null before there are any. */
   averageProgress: number | null;
   tier: Tier | null;
-  /** Weekly cards finished, all time, per tier. */
-  cards: CardCounts;
+  /** Cards finished this year, newest first, with their notes. */
+  cards: DoneCard[];
 }
 
 export interface LifeView {
@@ -387,7 +389,7 @@ export class RitmoService {
       daysLeft: daysLeftInYear(today),
       weeksLeft: weeksLeftInYear(today),
       yearProgress: (dayOfYear(today) - 1) / daysInYear(today.getFullYear()),
-      card: await this.getWeeklyCard(week),
+      card: await this.getCard(week, today),
       streak: await this.getStreak(today),
       dayBoundaryHour: this.boundaryHour
     };
@@ -911,50 +913,70 @@ export class RitmoService {
       months,
       averageProgress: yearDays ? yearSum / yearDays : null,
       tier: tierOf(yearDays ? yearSum / yearDays : null),
-      cards: countDoneCards(await this.repos.weeklyCards.list())
+      cards: doneCardsInYear(await this.repos.weeklyCards.list(), year)
     };
   }
 
-  /** Draws the week's three cards the first time they are asked for, then keeps them. */
-  private async getWeeklyCard(week: WeekRecord): Promise<WeeklyCardView> {
-    let pick = await this.repos.weeklyCards.get(week.id);
+  /** Draws the period's card the first time it is asked for, then keeps it. */
+  private async getCard(week: WeekRecord, today: Date): Promise<WeeklyCardView> {
+    const cadence = (await this.repos.settings.get())?.cardCadence ?? 'week';
+    const todayKey = toISODate(today);
+    const periodId = cardPeriodId(cadence, week.id, todayKey);
+
+    let pick = await this.repos.weeklyCards.get(periodId);
     if (!pick) {
       pick = {
-        id: week.id,
-        cardIds: drawWeeklySet(seenCardIds(await this.repos.weeklyCards.list())),
+        id: periodId,
+        cardIds: [drawCard(seenCardIds(await this.repos.weeklyCards.list()))],
         createdAt: now()
       };
       await this.repos.weeklyCards.put(pick);
     }
 
-    const picked = pick.pickedId ? cardById(pick.pickedId) : undefined;
+    const card = pick.pickedId ? cardById(pick.pickedId) : undefined;
     return {
-      weekId: week.id,
-      deadline: fromISODate(week.endDate),
-      state: !picked ? 'choose' : pick.doneAt ? 'done' : 'active',
-      options: pick.cardIds.flatMap((cardId) => {
-        const card = cardById(cardId);
-        return card ? [{ id: card.id, tier: card.tier }] : [];
-      }),
-      picked: picked ? { card: picked } : undefined
+      periodId,
+      cadence,
+      deadline: cadence === 'day' ? fromISODate(todayKey) : fromISODate(week.endDate),
+      state: !card ? 'closed' : pick.doneAt ? 'done' : 'active',
+      card,
+      note: pick.note
     };
   }
 
-  /** Opens one of the week's three cards. One pick per week; it cannot be changed. */
-  async pickWeeklyCard(weekId: ISODate, cardId: string) {
-    const pick = await this.repos.weeklyCards.get(weekId);
-    if (!pick || pick.pickedId || !pick.cardIds.includes(cardId)) return;
-    await this.repos.weeklyCards.put({ ...pick, pickedId: cardId, pickedAt: now() });
+  /** Turns the period's card over. */
+  async revealCard(periodId: string) {
+    const pick = await this.repos.weeklyCards.get(periodId);
+    if (!pick || pick.pickedId || pick.cardIds.length === 0) return;
+    await this.repos.weeklyCards.put({ ...pick, pickedId: pick.cardIds[0], pickedAt: now() });
   }
 
-  async completeWeeklyCard(weekId: ISODate) {
+  /** A few words about how it went. Empty text clears the note. */
+  async setCardNote(periodId: string, note: string) {
+    const pick = await this.repos.weeklyCards.get(periodId);
+    if (!pick?.pickedId) return;
+    const trimmed = note.trim();
+    const next = { ...pick };
+    if (trimmed) next.note = trimmed;
+    else delete next.note;
+    await this.repos.weeklyCards.put(next);
+  }
+
+  /** Weekly or daily. Takes effect right away; past cards stay as they were. */
+  async setCardCadence(cadence: CardCadence) {
+    const settings = await this.repos.settings.get();
+    if (!settings || settings.cardCadence === cadence) return;
+    await this.repos.settings.put({ ...settings, cardCadence: cadence });
+  }
+
+  async completeWeeklyCard(weekId: string) {
     const pick = await this.repos.weeklyCards.get(weekId);
     if (!pick || !pick.pickedId || pick.doneAt) return;
     await this.repos.weeklyCards.put({ ...pick, doneAt: now() });
   }
 
   /** Takes back a "done" tapped by mistake. The pick itself stays. */
-  async reopenWeeklyCard(weekId: ISODate) {
+  async reopenWeeklyCard(weekId: string) {
     const pick = await this.repos.weeklyCards.get(weekId);
     if (!pick?.doneAt) return;
     const rest = { ...pick };

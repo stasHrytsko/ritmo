@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { WEEKLY_CARDS } from './weeklyCards.data';
-import { CARD_TIERS, cardById, countDoneCards, drawWeeklySet, seenCardIds } from './weeklyCards';
+import { CARD_TIERS, cardPeriodId, doneCardsInYear, drawCard, seenCardIds } from './weeklyCards';
 import type { WeeklyCardPick } from './types';
 
 const pick = (over: Partial<WeeklyCardPick>): WeeklyCardPick => ({
@@ -20,35 +20,42 @@ describe('card bank', () => {
   });
 });
 
-describe('drawWeeklySet', () => {
-  it('draws one card per tier, in order', () => {
-    const ids = drawWeeklySet(new Set());
-    expect(ids.map((id) => cardById(id)?.tier)).toEqual(['easy', 'medium', 'hard']);
+describe('drawCard', () => {
+  it('draws from the whole bank, any difficulty', () => {
+    const tiers = new Set(Array.from({ length: 300 }, () => {
+      const id = drawCard(new Set());
+      return WEEKLY_CARDS.find((card) => card.id === id)?.tier;
+    }));
+    expect(tiers).toEqual(new Set(['easy', 'medium', 'hard']));
   });
 
-  it('skips cards already seen', () => {
-    const easy = WEEKLY_CARDS.filter((card) => card.tier === 'easy');
-    const seen = new Set(easy.slice(1).map((card) => card.id));
-    for (let i = 0; i < 20; i += 1) {
-      expect(drawWeeklySet(seen)[0]).toBe(easy[0].id);
-    }
+  it('skips cards already turned over', () => {
+    const seen = new Set(WEEKLY_CARDS.slice(1).map((card) => card.id));
+    for (let i = 0; i < 20; i += 1) expect(drawCard(seen)).toBe(WEEKLY_CARDS[0].id);
   });
 
-  it('starts a tier over once every card in it was seen', () => {
-    const seen = new Set(WEEKLY_CARDS.filter((card) => card.tier === 'hard').map((card) => card.id));
-    expect(cardById(drawWeeklySet(seen)[2])?.tier).toBe('hard');
+  it('starts over once every card was seen', () => {
+    const seen = new Set(WEEKLY_CARDS.map((card) => card.id));
+    expect(WEEKLY_CARDS.some((card) => card.id === drawCard(seen))).toBe(true);
   });
 });
 
-describe('counting', () => {
-  it('collects opened cards and counts only finished ones per tier', () => {
-    const easy = WEEKLY_CARDS.find((card) => card.tier === 'easy')!.id;
-    const hard = WEEKLY_CARDS.find((card) => card.tier === 'hard')!.id;
+describe('cards in a year', () => {
+  it('lists finished cards of that year, newest first, with notes', () => {
+    const [a, b] = WEEKLY_CARDS;
     const picks = [
-      pick({ id: '2026-09-07', pickedId: easy, doneAt: '2026-09-09T00:00:00Z' }),
-      pick({ id: '2026-09-14', pickedId: hard })
+      pick({ id: '2026-09-07', pickedId: a.id, doneAt: '2026-09-09T10:00:00Z', note: 'ok' }),
+      pick({ id: '2026-09-14', pickedId: b.id, doneAt: '2026-09-15T10:00:00Z' }),
+      pick({ id: '2025-12-29', pickedId: b.id, doneAt: '2025-12-30T10:00:00Z' }),
+      pick({ id: '2026-09-21', pickedId: a.id })
     ];
-    expect(seenCardIds(picks)).toEqual(new Set([easy, hard]));
-    expect(countDoneCards(picks)).toEqual({ easy: 1, medium: 0, hard: 0 });
+    expect(seenCardIds(picks)).toEqual(new Set([a.id, b.id]));
+    expect(doneCardsInYear(picks, 2026).map((item) => item.id)).toEqual(['2026-09-14', '2026-09-07']);
+    expect(doneCardsInYear(picks, 2026)[1].note).toBe('ok');
+  });
+
+  it('keys weekly cards by week and daily cards by day', () => {
+    expect(cardPeriodId('week', '2026-10-12', '2026-10-14')).toBe('2026-10-12');
+    expect(cardPeriodId('day', '2026-10-12', '2026-10-14')).toBe('d:2026-10-14');
   });
 });

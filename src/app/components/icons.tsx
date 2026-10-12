@@ -95,18 +95,3 @@ export function MedalMark({ tier, className = '' }: { tier: Tier; className?: st
     </svg>
   );
 }
-
-const TIER_STARS = { easy: 1, medium: 2, hard: 3 } as const;
-
-/** Difficulty as one, two or three outlined stars. */
-export function StarRow({ tier }: { tier: keyof typeof TIER_STARS }) {
-  return (
-    <span className="star-row" aria-hidden="true">
-      {Array.from({ length: TIER_STARS[tier] }, (_, index) => (
-        <svg key={index} viewBox="0 0 24 24">
-          <path d="M12 2.8l2.8 5.9 6.4.8-4.7 4.4 1.2 6.4L12 17.2l-5.7 3.1 1.2-6.4L2.8 9.5l6.4-.8z" />
-        </svg>
-      ))}
-    </span>
-  );
-}

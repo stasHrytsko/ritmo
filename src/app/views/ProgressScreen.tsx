@@ -2,7 +2,6 @@ import type { MonthView, WeekDayProgress, WeekView, YearView } from '../../appli
 import { TIER_LABELS, type Tier } from '../../domain/award';
 import { MedalMark } from '../components/icons';
 import { WEEKDAY_LETTERS, isoWeekday, plural, routineMinutes } from '../../domain/time';
-import { CARD_TIER_PLURALS, CARD_TIERS } from '../../domain/weeklyCards';
 import { Empty, PeriodSwitch, ProgressBar, ProgressSummary, SectionHeader, type PeriodView } from '../components/ui';
 
 export type ProgressData =
@@ -277,17 +276,25 @@ function YearBody({ data, onChange }: { data: YearView; onChange: (view: PeriodV
         </div>
       </div>
 
-      <section className="card-counters">
-        <SectionHeader title="Карты недели" meta="" />
-        <div className="summary-grid three-up">
-          {CARD_TIERS.map((tier) => (
-            <div className={`summary-card tier-${tier}`} key={tier}>
-              <span>{CARD_TIER_PLURALS[tier]}</span>
-              <strong>{data.cards[tier]}</strong>
-              <small>{plural(data.cards[tier], ['закрыта', 'закрыты', 'закрыто'])}</small>
-            </div>
-          ))}
-        </div>
+      <section className="content-block year-cards">
+        <SectionHeader title="Карты" meta={String(data.cards.length)} />
+        {data.cards.length === 0 ? (
+          <Empty text="Выполненные карты появятся здесь — вместе с вашими заметками." />
+        ) : (
+          <ul className="year-card-list">
+            {data.cards.map((item) => (
+              <li key={item.id}>
+                <span className="year-card-date">
+                  {new Date(item.doneAt).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })}
+                </span>
+                <span className="year-card-copy">
+                  <strong>{item.card.title}</strong>
+                  {item.note && <small>{item.note}</small>}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
       </section>
 
       <div className="quarters-list">
