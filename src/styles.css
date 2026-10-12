@@ -1149,8 +1149,8 @@ h1 {
 }
 
 .sheet-header button {
-  width: 38px;
-  height: 38px;
+  width: 44px;
+  height: 44px;
   border: 0;
   border-radius: 50%;
   background: var(--sheet-btn);
@@ -2342,9 +2342,9 @@ input {
 }
 
 .note-menu {
-  flex: 0 0 38px;
-  width: 38px;
-  height: 38px;
+  flex: 0 0 44px;
+  width: 44px;
+  height: 44px;
   margin-right: 8px;
   display: grid;
   place-items: center;
@@ -3832,4 +3832,51 @@ input {
   padding: 6px;
   font-size: 13px;
   color: var(--muted);
+}
+
+.secondary-button {
+  width: 100%;
+  min-height: 48px;
+  margin-top: 8px;
+  border: 0;
+  border-radius: 16px;
+  background: var(--row);
+  color: inherit;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.life-group-toggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 4px 4px 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+}
+
+.card-banner-undo {
+  margin-left: auto;
+  border: 0;
+  background: none;
+  padding: 10px 4px;
+  color: var(--muted);
+  font: inherit;
+  font-size: 13px;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.offline-banner {
+  margin: 0 0 12px;
+  padding: 10px 14px;
+  border-radius: 14px;
+  background: var(--row);
+  color: var(--muted);
+  font-size: 13px;
+  text-align: center;
 }

@@ -49,8 +49,6 @@ type Screen =
 const isProgress = (view: View): view is PeriodView =>
   view === 'week' || view === 'month' || view === 'year';
 
-const TOPBAR_LABELS: Partial<Record<View, string>> = { day: 'Сегодня', notes: 'Заметки' };
-
 /** How long a removal can be taken back before it is written. */
 const UNDO_MS = 5000;
 
@@ -73,6 +71,7 @@ export function App() {
   const [busy, setBusy] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [profileOpen, setProfileOpen] = useState(false);
+  const online = useOnline();
   // Today can ask Life to open straight into a new routine.
   const [newRoutineIntent, setNewRoutineIntent] = useState(false);
   const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
@@ -280,6 +279,15 @@ export function App() {
     await refresh('day');
   };
 
+  const reopenCard = async (weekId: ISODate) => {
+    try {
+      await service.reopenWeeklyCard(weekId);
+    } catch (cause) {
+      setError(describeError(cause));
+    }
+    await refresh('day');
+  };
+
   const exportBackup = async () => {
     try {
       const backup = await service.exportBackup();
@@ -344,7 +352,7 @@ export function App() {
       <header className="topbar">
         <button type="button" className="brand" onClick={() => navigate('day')}>Ritmo<span>.</span></button>
         <div className="topbar-right">
-          <TopbarMark view={view} screen={screen} />
+          <TopbarMark screen={screen} />
           {cloudConfigured && (
             <button
               type="button"
@@ -374,6 +382,11 @@ export function App() {
       )}
 
       <main>
+        {!online && (
+          <div className="offline-banner" role="status">
+            Нет сети — всё сохранится на устройстве и синхронизируется позже.
+          </div>
+        )}
         {error && (
           <div className="error-banner" role="alert">
             <div>
@@ -398,6 +411,7 @@ export function App() {
             onSelectDay={selectDay}
             onPickCard={pickCard}
             onCompleteCard={completeCard}
+            onReopenCard={reopenCard}
             onAddRoutine={() => {
               setNewRoutineIntent(true);
               navigate('life');
@@ -530,6 +544,10 @@ export function App() {
               await refresh('life');
             }}
             onToggleTask={toggleTask}
+            onSetGoalStatus={async (goal, status) => {
+              await service.setGoalStatus(goal, status);
+              await refresh('life');
+            }}
           />
         )}
       </main>
@@ -646,12 +664,11 @@ function withoutIds(screen: Screen, ids: ReadonlySet<string>): Screen {
 }
 
 /**
- * The right-hand side of the top bar: the running streak on Today, a plain
- * label elsewhere.
+ * The right-hand side of the top bar: the running streak on Today. Elsewhere
+ * the screen's own title and the bottom bar already say where you are.
  */
-function TopbarMark({ view, screen }: { view: View; screen: Screen | null }) {
-  if (screen?.view === 'day') {
-    if (!screen.data.isToday) return <div className="topbar-mark">День</div>;
+function TopbarMark({ screen }: { screen: Screen | null }) {
+  if (screen?.view === 'day' && screen.data.isToday) {
     const { current } = screen.data.streak;
     if (current > 0) {
       return (
@@ -662,5 +679,19 @@ function TopbarMark({ view, screen }: { view: View; screen: Screen | null }) {
       );
     }
   }
-  return <div className="topbar-mark">{TOPBAR_LABELS[view] ?? 'Прогресс'}</div>;
+  return null;
+}
+
+function useOnline() {
+  const [online, setOnline] = useState(() => navigator.onLine);
+  useEffect(() => {
+    const update = () => setOnline(navigator.onLine);
+    window.addEventListener('online', update);
+    window.addEventListener('offline', update);
+    return () => {
+      window.removeEventListener('online', update);
+      window.removeEventListener('offline', update);
+    };
+  }, []);
+  return online;
 }

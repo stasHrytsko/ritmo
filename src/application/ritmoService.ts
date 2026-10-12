@@ -568,6 +568,12 @@ export class RitmoService {
     await this.repos.goals.update({ ...goal, updatedAt: now() });
   }
 
+  /** Finishing a goal takes it off Today; reopening brings it back. */
+  async setGoalStatus(goal: Goal, status: Goal['status']) {
+    if (goal.status === status) return;
+    await this.repos.goals.update({ ...goal, status, updatedAt: now() });
+  }
+
   async deleteGoal(goalId: string) {
     await this.repos.goals.remove(goalId);
   }
@@ -945,6 +951,15 @@ export class RitmoService {
     const pick = await this.repos.weeklyCards.get(weekId);
     if (!pick || !pick.pickedId || pick.doneAt) return;
     await this.repos.weeklyCards.put({ ...pick, doneAt: now() });
+  }
+
+  /** Takes back a "done" tapped by mistake. The pick itself stays. */
+  async reopenWeeklyCard(weekId: ISODate) {
+    const pick = await this.repos.weeklyCards.get(weekId);
+    if (!pick?.doneAt) return;
+    const rest = { ...pick };
+    delete rest.doneAt;
+    await this.repos.weeklyCards.put(rest);
   }
 
   async getLife(): Promise<LifeView> {

@@ -291,7 +291,7 @@ function YearBody({ data, onChange }: { data: YearView; onChange: (view: PeriodV
       </section>
 
       <div className="quarters-list">
-        {[0, 1, 2, 3].map((quarterIndex) => {
+        {visibleQuarters(data, currentQuarter).map((quarterIndex) => {
           const months = data.months.slice(quarterIndex * 3, quarterIndex * 3 + 3);
           const medals = months.reduce((sum, month) => sum + month.medals, 0);
           const knownDays = months.reduce((sum, month) => sum + month.knownDays, 0);
@@ -332,7 +332,7 @@ function YearBody({ data, onChange }: { data: YearView; onChange: (view: PeriodV
               <div className="quarter-progress">
                 <span>
                   {knownDays
-                    ? `${Math.round((medals / knownDays) * 100)}% отмеченных дней с медалью`
+                    ? `${Math.round((medals / knownDays) * 100)}% дней с золотом`
                     : 'Отмеченных дней пока нет'}
                 </span>
               </div>
@@ -351,4 +351,16 @@ function TierBadge({ tier }: { tier: Tier }) {
       {TIER_LABELS[tier]}
     </span>
   );
+}
+
+/**
+ * Quarters before the first tracked day are empty for everyone who started
+ * mid-year; showing them is a wall of zeros. Show from the first tracked
+ * quarter to the current one.
+ */
+function visibleQuarters(data: YearView, currentQuarter: number): number[] {
+  const firstTracked = data.months.findIndex((month) => month.knownDays > 0);
+  const last = currentQuarter >= 0 ? currentQuarter : 3;
+  const first = firstTracked >= 0 ? Math.min(Math.floor(firstTracked / 3), last) : last;
+  return Array.from({ length: last - first + 1 }, (_, index) => first + index);
 }

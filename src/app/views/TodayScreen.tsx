@@ -22,6 +22,7 @@ export function TodayScreen({
   onSelectDay,
   onPickCard,
   onCompleteCard,
+  onReopenCard,
   onAddRoutine
 }: {
   data: TodayView;
@@ -30,6 +31,7 @@ export function TodayScreen({
   onSelectDay: (day: ISODate | undefined) => void;
   onPickCard: (weekId: ISODate, cardId: string) => Promise<void>;
   onCompleteCard: (weekId: ISODate) => Promise<void>;
+  onReopenCard: (weekId: ISODate) => Promise<void>;
   /** Opens the routine editor; offered when there is nothing to track yet. */
   onAddRoutine: () => void;
 }) {
@@ -222,6 +224,7 @@ export function TodayScreen({
             card={data.card}
             onPick={(cardId) => onPickCard(data.card.weekId, cardId)}
             onComplete={() => onCompleteCard(data.card.weekId)}
+            onReopen={() => onReopenCard(data.card.weekId)}
           />
         )}
 

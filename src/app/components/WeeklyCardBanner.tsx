@@ -15,11 +15,13 @@ const until = (deadline: Date) =>
 export function WeeklyCardBanner({
   card,
   onPick,
-  onComplete
+  onComplete,
+  onReopen
 }: {
   card: WeeklyCardView;
   onPick: (cardId: string) => Promise<void>;
   onComplete: () => Promise<void>;
+  onReopen: () => Promise<void>;
 }) {
   const [busy, setBusy] = useState(false);
   // Folded by default: the card is an invitation, not a block of the day.
@@ -42,6 +44,9 @@ export function WeeklyCardBanner({
           <strong>Карта недели выполнена</strong>
           <small>{card.picked.card.title}</small>
         </span>
+        <button type="button" className="card-banner-undo" disabled={busy} onClick={() => void run(onReopen)}>
+          Отменить
+        </button>
       </div>
     );
   }

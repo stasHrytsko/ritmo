@@ -3,7 +3,8 @@ import type { LifeView } from '../../application/ritmoService';
 import type { Goal, GoalTask, Routine } from '../../domain/types';
 import { addDays, routineMinutes, toISODate } from '../../domain/time';
 import { EditorSheet } from '../components/EditorSheet';
-import { Check, ChevronRight } from '../components/icons';
+import { Check, Chevron, ChevronRight } from '../components/icons';
+import { Collapse } from '../components/Collapse';
 import { Empty, Segmented, type SegmentOption } from '../components/ui';
 
 type LifeTab = 'routines' | 'goals';
@@ -74,6 +75,7 @@ export function LifeScreen({
   onDeleteGoal,
   onAddTask,
   onToggleTask,
+  onSetGoalStatus
 }: {
   data: LifeView;
   openNewRoutine?: boolean;
@@ -85,12 +87,23 @@ export function LifeScreen({
   onDeleteGoal: (id: string) => Promise<void>;
   onAddTask: (goalId: string, title: string) => Promise<void>;
   onToggleTask: (task: GoalTask) => Promise<void>;
+  onSetGoalStatus: (goal: Goal, status: Goal['status']) => Promise<void>;
 }) {
   const [tab, setTab] = useState<LifeTab>('routines');
   const [editorOpen, setEditorOpen] = useState(false);
   const [routineDraft, setRoutineDraft] = useState<RoutineDraft>(emptyRoutineDraft);
   const [goalDraft, setGoalDraft] = useState<GoalDraft>(emptyGoalDraft);
   const [taskDraft, setTaskDraft] = useState('');
+  const [showFinished, setShowFinished] = useState(false);
+  const activeGoals = data.goals.filter((goal) => goal.status !== 'done');
+  const finishedGoals = data.goals.filter((goal) => goal.status === 'done');
+  const editingGoal = goalDraft.id ? data.goals.find((goal) => goal.id === goalDraft.id) : undefined;
+
+  const openGoal = (goal: Goal) => {
+    setGoalDraft({ id: goal.id, name: goal.name, startDate: goal.startDate, endDate: goal.endDate });
+    setTaskDraft('');
+    setEditorOpen(true);
+  };
 
   useEffect(() => {
     if (!openNewRoutine) return;
@@ -229,38 +242,25 @@ export function LifeScreen({
 
         {tab === 'goals' && (
           <div className="life-groups">
-            {data.goals.length > 0 && (
-              <ul className="inset-list">
-                {data.goals.map((goal) => {
-                  const tasks = data.tasks.filter((task) => task.goalId === goal.id);
-                  const done = tasks.filter((task) => task.status === 'done').length;
-                  return (
-                    <li className="inset-row" key={goal.id}>
-                      <button
-                        type="button"
-                        className="inset-row-main"
-                        onClick={() => {
-                          setGoalDraft({
-                            id: goal.id,
-                            name: goal.name,
-                            startDate: goal.startDate,
-                            endDate: goal.endDate
-                          });
-                          setTaskDraft('');
-                          setEditorOpen(true);
-                        }}
-                      >
-                        <strong>{goal.name}</strong>
-                        <small>{formatGoalDates(goal.startDate, goal.endDate)}</small>
-                      </button>
-                      <span className="inset-row-meta">{done}/{tasks.length}</span>
-                      <ChevronRight />
-                    </li>
-                  );
-                })}
-              </ul>
+            {activeGoals.length > 0 && <GoalList goals={activeGoals} tasks={data.tasks} onOpen={openGoal} />}
+            {activeGoals.length === 0 && <Empty text={finishedGoals.length ? 'Активных целей нет.' : 'Целей пока нет.'} />}
+
+            {finishedGoals.length > 0 && (
+              <section className="life-group">
+                <button
+                  type="button"
+                  className="life-group-toggle"
+                  aria-expanded={showFinished}
+                  onClick={() => setShowFinished((current) => !current)}
+                >
+                  <span className="life-group-label">Завершённые · {finishedGoals.length}</span>
+                  <Chevron />
+                </button>
+                <Collapse open={showFinished}>
+                  <GoalList goals={finishedGoals} tasks={data.tasks} onOpen={openGoal} />
+                </Collapse>
+              </section>
             )}
-            {data.goals.length === 0 && <Empty text="Целей пока нет." />}
           </div>
         )}
       </div>
@@ -372,11 +372,6 @@ export function LifeScreen({
             </label>
           </div>
 
-          <button type="button" className="primary" disabled={Boolean(goalProblem)} onClick={() => void saveGoal()}>
-            {goalDraft.id ? 'Сохранить' : 'Добавить цель'}
-          </button>
-          {goalProblem && <p className="form-hint">{goalProblem}</p>}
-
           {goalDraft.id && (
             <>
               <div className="editor-divider" />
@@ -414,10 +409,28 @@ export function LifeScreen({
                 </div>
               </div>
 
+            </>
+          )}
+
+          <button type="button" className="primary" disabled={Boolean(goalProblem)} onClick={() => void saveGoal()}>
+            {goalDraft.id ? 'Сохранить' : 'Добавить цель'}
+          </button>
+          {goalProblem && <p className="form-hint">{goalProblem}</p>}
+
+          {editingGoal && (
+            <>
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={() => void onSetGoalStatus(editingGoal, editingGoal.status === 'done' ? 'active' : 'done')
+                  .then(closeGoalEditor)}
+              >
+                {editingGoal.status === 'done' ? 'Вернуть в работу' : 'Завершить цель'}
+              </button>
               <button
                 type="button"
                 className="danger-link"
-                onClick={() => void onDeleteGoal(goalDraft.id!).then(closeGoalEditor)}
+                onClick={() => void onDeleteGoal(editingGoal.id).then(closeGoalEditor)}
               >
                 Удалить цель
               </button>
@@ -473,4 +486,25 @@ function formatSchedule(days: number[]) {
     .sort((a, b) => a - b)
     .map((day) => WEEKDAYS[day - 1]?.short ?? '')
     .join(', ');
+}
+
+function GoalList({ goals, tasks, onOpen }: { goals: Goal[]; tasks: GoalTask[]; onOpen: (goal: Goal) => void }) {
+  return (
+    <ul className="inset-list">
+      {goals.map((goal) => {
+        const own = tasks.filter((task) => task.goalId === goal.id);
+        const done = own.filter((task) => task.status === 'done').length;
+        return (
+          <li className={`inset-row${goal.status === 'done' ? ' is-off' : ''}`} key={goal.id}>
+            <button type="button" className="inset-row-main" onClick={() => onOpen(goal)}>
+              <strong>{goal.name}</strong>
+              <small>{formatGoalDates(goal.startDate, goal.endDate)}</small>
+            </button>
+            <span className="inset-row-meta">{done}/{own.length}</span>
+            <ChevronRight />
+          </li>
+        );
+      })}
+    </ul>
+  );
 }

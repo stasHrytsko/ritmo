@@ -751,3 +751,24 @@ describe('medal tiers', () => {
     expect(await done(1)).toBeNull();
   });
 });
+
+describe('polish', () => {
+  it('reopens a weekly card marked done by mistake', async () => {
+    const { options, weekId } = (await service.getDay()).card;
+    await service.pickWeeklyCard(weekId, options[0].id);
+    await service.completeWeeklyCard(weekId);
+    expect((await service.getDay()).card.state).toBe('done');
+    await service.reopenWeeklyCard(weekId);
+    expect((await service.getDay()).card.state).toBe('active');
+  });
+
+  it('finishing a goal takes it off Today and reopening brings it back', async () => {
+    await service.createGoal('Goal', '2026-09-01', '2026-12-01');
+    const goal = store.goals[0];
+    expect((await service.getDay()).goals).toHaveLength(1);
+    await service.setGoalStatus(goal, 'done');
+    expect((await service.getDay()).goals).toHaveLength(0);
+    await service.setGoalStatus(store.goals[0], 'active');
+    expect((await service.getDay()).goals).toHaveLength(1);
+  });
+});

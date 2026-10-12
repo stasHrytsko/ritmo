@@ -69,7 +69,6 @@ export function NotesScreen({
 
   return (
     <section className="screen notes-screen">
-      <div className="eyebrow">Бэклог</div>
       <h1>Заметки</h1>
 
       <button type="button" className="add-new" onClick={() => setCreating(true)}>
