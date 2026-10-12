@@ -105,7 +105,8 @@ export const clearSyncState = () => {
   try { localStorage.removeItem(SYNC_KEY); } catch { /* storage unavailable */ }
 };
 
-export type AvatarKind = 'male' | 'female';
+export const AVATARS = ['m1', 'm2', 'f1', 'f2'] as const;
+export type AvatarKind = (typeof AVATARS)[number];
 export type ReminderMode = 'off' | 'morning' | 'evening' | 'each';
 
 export interface Profile {
@@ -114,11 +115,17 @@ export interface Profile {
   reminder: ReminderMode;
 }
 
+/** Accounts made before there were four avatars stored 'male' or 'female'. */
+const avatarOf = (value: unknown): AvatarKind => {
+  if ((AVATARS as readonly unknown[]).includes(value)) return value as AvatarKind;
+  return value === 'female' ? 'f1' : 'm2';
+};
+
 export const profileOf = (session: Session): Profile => {
   const meta = session.user.user_metadata ?? {};
   return {
     name: typeof meta.name === 'string' ? meta.name : '',
-    avatar: meta.avatar === 'female' ? 'female' : 'male',
+    avatar: avatarOf(meta.avatar),
     reminder: ['morning', 'evening', 'each'].includes(meta.reminder as string)
       ? (meta.reminder as ReminderMode)
       : 'off'

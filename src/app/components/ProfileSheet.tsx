@@ -5,6 +5,7 @@ import {
   profileOf,
   saveProfile,
   signOut,
+  AVATARS,
   type AvatarKind,
   type ReminderMode
 } from '../../infrastructure/cloud';
@@ -103,17 +104,17 @@ function SignedIn({
         }}
       >
         <div className="avatar-picker" role="radiogroup" aria-label="Аватар">
-          {(['male', 'female'] as const).map((kind) => (
+          {AVATARS.map((kind, index) => (
             <button
               key={kind}
               type="button"
               role="radio"
               aria-checked={avatar === kind}
-              aria-label={kind === 'male' ? 'Мужской аватар' : 'Женский аватар'}
+              aria-label={`Аватар ${index + 1}`}
               className={avatar === kind ? 'selected' : ''}
               onClick={() => setAvatar(kind)}
             >
-              <Avatar kind={kind} size={64} />
+              <Avatar kind={kind} size={66} />
             </button>
           ))}
         </div>

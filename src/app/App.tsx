@@ -362,7 +362,7 @@ export function App() {
               aria-label="Профиль"
               onClick={() => setProfileOpen(true)}
             >
-              <Avatar kind={cloud.session ? profileOf(cloud.session).avatar : 'male'} size={40} />
+              <Avatar kind={cloud.session ? profileOf(cloud.session).avatar : 'm2'} size={40} />
             </button>
           )}
         </div>

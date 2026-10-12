@@ -3145,9 +3145,23 @@ input {
   box-shadow: var(--shadow-sm);
 }
 
-.avatar-bg { fill: var(--line-strong); }
-.avatar-fg { fill: var(--muted); }
-.avatar-skin { fill: var(--surface-strong); }
+.avatar {
+  display: inline-block;
+  border-radius: 50%;
+  background: var(--card);
+  overflow: hidden;
+}
+
+.avatar i {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: var(--ink);
+  mask-size: 100% 100%;
+  -webkit-mask-size: 100% 100%;
+  mask-repeat: no-repeat;
+  -webkit-mask-repeat: no-repeat;
+}
 
 .profile-form {
   display: grid;
@@ -3157,7 +3171,7 @@ input {
 .avatar-picker {
   display: flex;
   justify-content: center;
-  gap: 16px;
+  gap: 8px;
 }
 
 .avatar-picker button {
