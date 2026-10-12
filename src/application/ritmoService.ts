@@ -238,7 +238,9 @@ export class RitmoService {
         schemaVersion: SCHEMA_VERSION,
         installedAt: now(),
         dayBoundaryHour: 3,
-        defaultsSeedVersion: 0
+        // A new account starts from a clean slate: the built-in routines were one
+        // person's own, so only installs that predate the seed ever get them.
+        defaultsSeedVersion: 1
       };
       await this.repos.settings.put(settings);
     }
@@ -256,6 +258,16 @@ export class RitmoService {
     }
 
     await this.ensureWeek(this.today());
+  }
+
+  /**
+   * Wipes everything on this device and starts over as a brand-new install.
+   * Used when another account takes over the device.
+   */
+  async resetLocal() {
+    await this.repos.backup.clearAll();
+    this.booting = undefined;
+    await this.init();
   }
 
   private async seedPersonalRoutine() {

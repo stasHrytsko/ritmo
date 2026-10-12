@@ -46,6 +46,7 @@ export const verifyCode = async (email: string, token: string) => {
 export const signOut = async () => {
   await client().auth.signOut();
   clearSyncState();
+  clearOwner();
 };
 
 export interface CloudBackup {
@@ -141,4 +142,19 @@ export const saveProfile = async (profile: Profile) => {
 export const changeEmail = async (email: string) => {
   const { error } = await client().auth.updateUser({ email });
   if (error) throw error;
+};
+
+const OWNER_KEY = 'ritmo.owner';
+
+/** Which account the data on this device belongs to; null for data made without one. */
+export const readOwner = (): string | null => {
+  try { return localStorage.getItem(OWNER_KEY); } catch { return null; }
+};
+
+export const writeOwner = (userId: string) => {
+  try { localStorage.setItem(OWNER_KEY, userId); } catch { /* storage unavailable */ }
+};
+
+export const clearOwner = () => {
+  try { localStorage.removeItem(OWNER_KEY); } catch { /* storage unavailable */ }
 };

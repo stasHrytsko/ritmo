@@ -4,7 +4,6 @@ import {
   changeEmail,
   profileOf,
   saveProfile,
-  signOut,
   AVATARS,
   type AvatarKind,
   type ReminderMode
@@ -35,11 +34,13 @@ export function ProfileSheet({
   session,
   status,
   onSync,
+  onSignOut,
   onClose
 }: {
   session: Session | null;
   status: SyncStatus;
   onSync: () => void;
+  onSignOut: () => void;
   onClose: () => void;
 }) {
   if (!session) {
@@ -49,18 +50,20 @@ export function ProfileSheet({
       </EditorSheet>
     );
   }
-  return <SignedIn session={session} status={status} onSync={onSync} onClose={onClose} />;
+  return <SignedIn session={session} status={status} onSync={onSync} onSignOut={onSignOut} onClose={onClose} />;
 }
 
 function SignedIn({
   session,
   status,
   onSync,
+  onSignOut,
   onClose
 }: {
   session: Session;
   status: SyncStatus;
   onSync: () => void;
+  onSignOut: () => void;
   onClose: () => void;
 }) {
   const initial = profileOf(session);
@@ -166,7 +169,7 @@ function SignedIn({
 
         <div className="backup-actions">
           <button type="submit" className="primary" disabled={busy}>Сохранить</button>
-          <button type="button" onClick={() => { void signOut(); onClose(); }}>Выйти</button>
+          <button type="button" onClick={onSignOut}>Выйти</button>
         </div>
 
         <div className="profile-sync">

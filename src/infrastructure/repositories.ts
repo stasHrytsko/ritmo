@@ -112,6 +112,28 @@ export const repositories: Repositories = {
       weeklyCards: await db.weeklyCards.toArray(),
       settings: await db.settings.toArray()
     }),
+    clearAll: async () => {
+      await db.transaction(
+        'rw',
+        [
+          db.routines, db.goals, db.goalTasks, db.notes, db.noteEntries,
+          db.weeks, db.completions, db.weeklyCards, db.settings
+        ],
+        async () => {
+          await Promise.all([
+            db.routines.clear(),
+            db.goals.clear(),
+            db.goalTasks.clear(),
+            db.notes.clear(),
+            db.noteEntries.clear(),
+            db.weeks.clear(),
+            db.completions.clear(),
+            db.weeklyCards.clear(),
+            db.settings.clear()
+          ]);
+        }
+      );
+    },
     importAll: async (payload: BackupPayload) => {
       // Validate and upgrade before anything is cleared: a malformed file must
       // never be able to land halfway through a restore.

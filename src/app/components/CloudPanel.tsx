@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { Session } from '@supabase/supabase-js';
-import { cloudConfigured, requestCode, signOut, verifyCode } from '../../infrastructure/cloud';
+import { cloudConfigured, requestCode, verifyCode } from '../../infrastructure/cloud';
 import type { SyncStatus } from '../cloudSync';
 
 const STATUS_LABELS: Record<SyncStatus, string> = {
@@ -105,12 +105,14 @@ export function CloudPanel({
   session,
   status,
   message,
-  onSync
+  onSync,
+  onSignOut
 }: {
   session: Session | null;
   status: SyncStatus;
   message: string | null;
   onSync: () => void;
+  onSignOut: () => void;
 }) {
   if (!cloudConfigured) return null;
   if (!session) return <AuthForm />;
@@ -125,7 +127,7 @@ export function CloudPanel({
       </div>
       <div className="backup-actions">
         <button type="button" disabled={status === 'syncing'} onClick={onSync}>Синхронизировать</button>
-        <button type="button" onClick={() => void signOut()}>Выйти</button>
+        <button type="button" onClick={onSignOut}>Выйти</button>
       </div>
     </div>
   );

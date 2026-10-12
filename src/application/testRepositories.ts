@@ -118,7 +118,18 @@ export function createMemoryRepositories(): { repos: Repositories; store: Memory
     },
     backup: {
       exportAll: async () => { throw new Error('not used in tests'); },
-      importAll: async () => { throw new Error('not used in tests'); }
+      importAll: async () => { throw new Error('not used in tests'); },
+      clearAll: async () => {
+        store.routines.length = 0;
+        store.goals.length = 0;
+        store.goalTasks.length = 0;
+        store.notes.length = 0;
+        store.noteEntries.length = 0;
+        store.weeks.length = 0;
+        store.completions.length = 0;
+        store.weeklyCards.length = 0;
+        store.settings = undefined;
+      }
     }
   };
 

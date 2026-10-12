@@ -257,6 +257,7 @@ export function App() {
   const cloud = useCloudSync({
     exportBackup: useCallback(() => service.exportBackup(), [service]),
     importBackup: useCallback((payload) => service.importBackup(payload), [service]),
+    resetLocal: useCallback(() => service.resetLocal(), [service]),
     onPulled: useCallback(() => { void service.init().then(() => refresh(viewRef.current)); }, [service, refresh])
   });
 
@@ -373,6 +374,7 @@ export function App() {
           session={cloud.session}
           status={cloud.status}
           onSync={() => void cloud.sync()}
+          onSignOut={() => void cloud.leave()}
           onClose={() => setProfileOpen(false)}
         />
       )}
@@ -540,6 +542,7 @@ export function App() {
                 status={cloud.status}
                 message={cloud.message}
                 onSync={() => void cloud.sync()}
+                onSignOut={() => void cloud.leave()}
               />
             )}
           />

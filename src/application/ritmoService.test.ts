@@ -39,15 +39,46 @@ const addRoutine = async (name: string, weekdays = [1, 2, 3, 4, 5, 6, 7]) => {
 };
 
 describe('init', () => {
-  it('seeds the default routines once, even when called concurrently', async () => {
+  it('starts a brand-new install with nothing in it', async () => {
     const { repos: fresh } = createMemoryRepositories();
     const twice = new RitmoService(fresh);
     await Promise.all([twice.init(), twice.init(), twice.init()]);
-    const seeded = await fresh.routines.list();
-    expect(seeded).toHaveLength(17);
+    expect(await fresh.routines.list()).toHaveLength(0);
+    expect(await fresh.goals.list()).toHaveLength(0);
 
     await twice.init();
-    expect(await fresh.routines.list()).toHaveLength(17);
+    expect(await fresh.routines.list()).toHaveLength(0);
+  });
+
+  it('still seeds the built-in routines for an install that predates the seed', async () => {
+    const { repos: legacy } = createMemoryRepositories();
+    await legacy.settings.put({
+      key: 'app',
+      schemaVersion: 3,
+      installedAt: NOW.toISOString(),
+      dayBoundaryHour: 3
+    });
+    await new RitmoService(legacy).init();
+    expect(await legacy.routines.list()).toHaveLength(17);
+  });
+
+  it('resetLocal wipes the device back to a clean slate', async () => {
+    await addRoutine('Walk');
+    await service.createGoal('Goal', '2026-09-01', '2026-12-01');
+    await service.toggleRoutine(service.today(), store.routines[0].id);
+    const before = store.settings?.installedAt;
+
+    await service.resetLocal();
+
+    expect(store.routines).toHaveLength(0);
+    expect(store.goals).toHaveLength(0);
+    expect(store.completions).toHaveLength(0);
+    expect(store.weeklyCards).toHaveLength(0);
+    // Opened again as a fresh install: settings recreated, nothing seeded.
+    expect(store.settings).toBeDefined();
+    expect(store.settings?.defaultsSeedVersion).toBe(1);
+    expect(store.weeks).toHaveLength(1);
+    expect(before).toBeDefined();
   });
 
   it('opens the current week', () => {

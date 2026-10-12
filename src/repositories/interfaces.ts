@@ -84,6 +84,8 @@ export interface SettingsRepository {
 export interface BackupRepository {
   exportAll(): Promise<BackupPayload>;
   importAll(payload: BackupPayload): Promise<void>;
+  /** Removes every record, settings included. */
+  clearAll(): Promise<void>;
 }
 
 export interface Repositories {
